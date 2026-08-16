@@ -1,0 +1,60 @@
+/* ============ Образ по фото (api/compose-look) — своя мини-вёрстка поверх wizard.css ============ */
+
+.lb-shell {
+  animation: wizard-step-in 0.4s var(--ease-soft) both;
+}
+
+.lb-upload {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: clamp(28px, 6vw, 44px) 20px;
+  border-radius: 20px;
+  border: 1px dashed var(--glow-silver);
+  background: rgba(255, 255, 255, 0.35);
+  text-align: center;
+}
+
+.lb-preview {
+  max-width: 220px;
+  max-height: 280px;
+  border-radius: 14px;
+  border: 1px solid var(--glow-silver);
+  object-fit: cover;
+  display: none;
+}
+
+.lb-status {
+  font-family: var(--font-body);
+  font-size: 0.88rem;
+  line-height: 1.6;
+  color: var(--text-faint);
+  max-width: 420px;
+}
+
+.lb-status--ok { color: var(--accent-gold-ink); }
+.lb-status--error { color: #b23b2e; }
+
+.lb-actions {
+  margin-top: clamp(24px, 5vw, 36px);
+  text-align: center;
+}
+
+.lb-result-image {
+  width: 100%;
+  max-width: 420px;
+  display: block;
+  margin: 0 auto clamp(24px, 5vw, 36px);
+  border-radius: 20px;
+  border: 1px solid var(--glow-silver);
+}
+
+.lb-restart {
+  text-align: center;
+  margin-top: clamp(28px, 5vw, 40px);
+}
+
+@media (max-width: 640px) {
+  .lb-preview { max-width: 160px; max-height: 200px; }
+}

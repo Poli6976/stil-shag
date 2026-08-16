@@ -4,15 +4,15 @@
 <meta charset="utf-8">
 <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Онлайн-стилист — Стиль</title>
-<meta name="description" content="Покажите вещь, ответьте на пару простых вопросов — и получите образ по слоям с объяснением, почему именно так.">
+<title>Образ по фото — Стиль</title>
+<meta name="description" content="Загрузите своё фото в одной вещи ансамбля — платье, жакете, брюках — и получите полный образ вокруг неё, собранный ИИ-стилистом.">
 <meta property="og:type" content="website">
-<meta property="og:title" content="Онлайн-стилист — Стиль">
-<meta property="og:description" content="Покажите вещь, ответьте на пару простых вопросов — и получите образ по слоям с объяснением, почему именно так.">
+<meta property="og:title" content="Образ по фото — Стиль">
+<meta property="og:description" content="Загрузите своё фото в одной вещи ансамбля — и получите полный образ вокруг неё.">
 <meta property="og:image" content="assets/WKnaQxw-vzS6oO1OZq5uZ_5R9gOm7j.webp">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Онлайн-стилист — Стиль">
-<meta name="twitter:description" content="Покажите вещь, ответьте на пару простых вопросов — и получите образ по слоям с объяснением, почему именно так.">
+<meta name="twitter:title" content="Образ по фото — Стиль">
+<meta name="twitter:description" content="Загрузите своё фото в одной вещи ансамбля — и получите полный образ вокруг неё.">
 <meta name="twitter:image" content="assets/WKnaQxw-vzS6oO1OZq5uZ_5R9gOm7j.webp">
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -24,6 +24,7 @@
 <link rel="stylesheet" href="css/components/button-3d.css?v=3">
 <link rel="stylesheet" href="css/inner.css?v=16">
 <link rel="stylesheet" href="css/wizard.css?v=3">
+<link rel="stylesheet" href="css/look-builder.css?v=1">
 </head>
 <body>
 
@@ -40,26 +41,17 @@
 
 <main>
   <section class="page-hero page-hero--tight">
-    <span class="page-hero__eyebrow">Онлайн-стилист</span>
-    <h1>Соберите образ вокруг своей вещи</h1>
+    <span class="page-hero__eyebrow">Образ по фото · пробный запуск</span>
+    <h1>Покажите вещь на себе — получите образ вокруг неё</h1>
     <p class="page-hero__lead">
-      Пара вопросов по одному за раз — и вы получите образ по слоям с объяснением, почему именно так.
-      Первый раз — бесплатно, без покупки.
-    </p>
-    <p class="page-hero__lead">
-      Уже сфотографировались в вещи? Попробуйте <a href="obraz-po-foto.html">образ по фото</a> —
-      загрузите своё фото, и ИИ-стилист соберёт и нарисует образ вокруг того, что на вас надето.
+      Загрузите своё фото в одной вещи ансамбля — платье, жакете, брюках — и ИИ-стилист распишет
+      полный образ по слоям и нарисует, как он может выглядеть. Это иллюстрация на условной модели,
+      не точная фотография вас в готовом образе — но уже настоящий подбор, не заготовленный шаблон.
     </p>
   </section>
+
   <div class="wizard-shell">
-    <div class="wizard-progress">
-      <span class="wizard-progress__label" id="wizardProgressLabel">Шаг 1 из 7</span>
-      <div class="wizard-progress__bar"><div class="wizard-progress__fill" id="wizardProgressFill"></div></div>
-    </div>
-    <div class="wizard-step" id="wizardStep"></div>
-    <noscript>
-      <p class="wizard-step__hint">Подбор образа работает на JavaScript — включите его в браузере, чтобы пройти анкету.</p>
-    </noscript>
+    <div class="lb-shell" id="lookBuilder"></div>
   </div>
 </main>
 
@@ -92,7 +84,7 @@
   </div>
 </footer>
 
-<script src="js/wizard.js"></script>
+<script src="js/look-builder.js"></script>
 <script src="js/nav-active.js"></script>
 </body>
 </html>
