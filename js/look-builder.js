@@ -70,6 +70,16 @@
 
     var status = el('p', 'lb-status', 'На фото должны быть вы — в вещи, вокруг которой хотим собрать образ. Лицо можно не показывать крупным планом, но силуэт и вещь должны быть видны целиком.');
 
+    var fitField = el('div', 'wizard-field');
+    var fitLabel = el('label', null, 'Рост и размер — необязательно, но поможет с посадкой и длиной вещей');
+    fitLabel.setAttribute('for', 'lbFit');
+    var fitInput = el('input', 'wizard-input');
+    fitInput.id = 'lbFit';
+    fitInput.type = 'text';
+    fitInput.placeholder = 'Например: 165 см, 44 размер';
+    fitField.appendChild(fitLabel);
+    fitField.appendChild(fitInput);
+
     var goBtn = el('a', 'btn-3d btn-3d--rect', 'Собрать образ');
     goBtn.href = '#';
     goBtn.setAttribute('disabled', '');
@@ -106,18 +116,19 @@
     box.appendChild(input);
     box.appendChild(status);
     root.appendChild(box);
+    root.appendChild(fitField);
 
     var actions = el('div', 'lb-actions');
     goBtn.addEventListener('click', function (e) {
       e.preventDefault();
       if (goBtn.hasAttribute('disabled') || !state.dataUrl) return;
-      submitLook(status, goBtn);
+      submitLook(status, goBtn, fitInput.value);
     });
     actions.appendChild(goBtn);
     root.appendChild(actions);
   }
 
-  function submitLook(status, goBtn) {
+  function submitLook(status, goBtn, fit) {
     goBtn.setAttribute('disabled', '');
     goBtn.setAttribute('aria-disabled', 'true');
     status.textContent = 'Разбираю фото и собираю образ — это может занять до 30 секунд…';
@@ -126,7 +137,7 @@
     fetch('api/compose-look', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ image: state.dataUrl })
+      body: JSON.stringify({ image: state.dataUrl, fit: fit })
     })
       .then(function (res) {
         if (!res.ok) {

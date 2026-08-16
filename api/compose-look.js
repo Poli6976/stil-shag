@@ -33,8 +33,11 @@ const SYSTEM_PROMPT =
   'заключений, ровно в этом порядке и с этими названиями слоёв:\n' +
   LAYER_KEYS.join('\n') + '\n' +
   'Если слой уже выполняет вещь с фото (например, это платье и роль "Низ" ему не нужна отдельно) — ' +
-  'напиши в этой строке "эта же вещь". После всех слоёв — ещё одна строка "Почему: " с 1-2 ' +
-  'предложениями логики по силуэту и цвету. Конкретно, без оценочных слов вроде "прекрасно".';
+  'напиши в этой строке "эта же вещь". Если пользователь указал рост и размер — учти их при выборе ' +
+  'кроя и силуэта каждой вещи (посадка, длина, свободный или приталенный крой), но не обсуждай ' +
+  'фигуру или тело в тексте ответа — это должно быть видно только в подобранном крое. После всех ' +
+  'слоёв — ещё одна строка "Почему: " с 1-2 предложениями логики по силуэту и цвету. Конкретно, ' +
+  'без оценочных слов вроде "прекрасно".';
 
 function parseLayers(text) {
   var layers = {};
@@ -100,9 +103,14 @@ module.exports = async function handler(req, res) {
       return;
     }
 
+    var fit = typeof body.fit === 'string' ? body.fit.trim().slice(0, 200) : '';
+    var userText = fit
+      ? 'Собери образ по фото. Рост и размер: ' + fit
+      : 'Собери образ по фото.';
+
     var token = await getAccessToken();
     var fileId = await uploadFile(token, imageBuffer, mime);
-    var raw = await chatWithImage(token, SYSTEM_PROMPT, 'Собери образ по фото.', fileId);
+    var raw = await chatWithImage(token, SYSTEM_PROMPT, userText, fileId);
     var parsed = parseLayers(raw);
 
     var imageBase64 = await generateLookImage(buildImagePrompt(parsed.layers));
