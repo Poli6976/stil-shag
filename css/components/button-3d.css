@@ -1,0 +1,88 @@
+/*
+  Переиспользуемая кнопка проекта — адаптация форм/физики из эмодзи/button*.html
+  под тёмную космическую тему. Сохранена вся объёмность (многослойный box-shadow),
+  пружинистое нажатие (translateY + scaleY, cubic-bezier) — меняется только
+  цветовая семантика: белый радиальный градиент -> тёмно-фиолетовый + золотой glow.
+
+  Разметка:
+    <a href="structure.html" class="btn-3d btn-3d--rect">Структура сайта</a>
+  Модификаторы формы: --pill (овальная), --rect (скругление 30px), --circle (круглая)
+*/
+
+.btn-3d {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  cursor: pointer;
+  text-decoration: none;
+  color: var(--btn-text);
+  font-family: var(--font-body);
+  font-weight: 400;
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  font-size: var(--fs-small);
+  user-select: none;
+  outline: none;
+
+  background: radial-gradient(ellipse at 50% 32%,
+    #f8d99a 0%,
+    #f0c377 22%,
+    #d99a3f 46%,
+    #a86b23 68%,
+    #7a4d15 86%,
+    #5c380d 100%
+  );
+  box-shadow:
+    0 8px 0 #3a220a,
+    inset -8px -8px 18px rgba(58, 34, 10, 0.38),
+    inset 8px 8px 18px rgba(255, 238, 200, 0.4),
+    0 10px 24px rgba(43, 23, 6, 0.45),
+    0 0 26px var(--glow-gold);
+
+  transition: transform 0.15s var(--ease-btn), box-shadow 0.15s var(--ease-btn);
+  transform: translateY(0);
+}
+
+.btn-3d:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 10px 0 #3a220a,
+    inset -10px -10px 22px rgba(58, 34, 10, 0.4),
+    inset 10px 10px 22px rgba(255, 238, 200, 0.48),
+    0 16px 30px rgba(43, 23, 6, 0.5),
+    0 0 38px var(--glow-gold);
+}
+
+.btn-3d:active {
+  transform: translateY(6px) scaleY(0.94);
+  box-shadow:
+    0 2px 0 #3a220a,
+    inset 0 4px 10px rgba(43, 23, 6, 0.5),
+    inset -6px -6px 12px rgba(58, 34, 10, 0.4),
+    inset 6px 6px 12px rgba(255, 238, 200, 0.42),
+    0 4px 10px rgba(43, 23, 6, 0.45);
+}
+
+.btn-3d:focus-visible {
+  outline: 2px solid var(--accent-gold);
+  outline-offset: 4px;
+}
+
+.btn-3d--pill {
+  border-radius: var(--radius-pill);
+  padding: 18px 44px;
+}
+
+.btn-3d--rect {
+  border-radius: var(--radius-rect);
+  min-width: 200px;
+  padding: 22px 30px;
+}
+
+.btn-3d--circle {
+  border-radius: 50%;
+  width: 96px;
+  height: 96px;
+}

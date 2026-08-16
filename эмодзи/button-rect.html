@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Прямоугольная кнопка</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .button-container {
+            perspective: 1000px;
+        }
+
+        .btn {
+            position: relative;
+            width: 180px;
+            height: 100px;
+            border: none;
+            border-radius: 30px;
+            cursor: pointer;
+            outline: none;
+            background: radial-gradient(ellipse at 50% 35%, #ffffff 0%, #f5f5f5 60%, #efefef 100%);
+
+            /* Основная тень (глубина) с эффектом опущенных краев */
+            box-shadow:
+                0 8px 0 #e0e0e0,
+                inset -8px -8px 16px rgba(0, 0, 0, 0.08),
+                inset 8px 8px 16px rgba(255, 255, 255, 0.6),
+                0 10px 20px rgba(0, 0, 0, 0.2);
+
+            transition: all 0.15s cubic-bezier(0.34, 1.56, 0.64, 1);
+            transform: translateY(0);
+            user-select: none;
+        }
+
+        /* Эффект при наведении */
+        .btn:hover {
+            background: radial-gradient(ellipse at 50% 35%, #ffffff 0%, #f8f8f8 60%, #f5f5f5 100%);
+            box-shadow:
+                0 12px 0 #d0d0d0,
+                inset -10px -10px 20px rgba(0, 0, 0, 0.1),
+                inset 10px 10px 20px rgba(255, 255, 255, 0.7),
+                0 14px 28px rgba(0, 0, 0, 0.25);
+            transform: translateY(-2px);
+        }
+
+        /* Эффект при нажатии - углубление с сферичностью и опущенными краями */
+        .btn:active {
+            background: radial-gradient(ellipse at 50% 50%, #f8f8f8 0%, #f0f0f0 50%, #e8e8e8 100%);
+            box-shadow:
+                0 2px 0 #d0d0d0,
+                inset 0 4px 8px rgba(0, 0, 0, 0.15),
+                inset -6px -6px 12px rgba(0, 0, 0, 0.12),
+                inset 6px 6px 12px rgba(255, 255, 255, 0.9),
+                0 4px 8px rgba(0, 0, 0, 0.2);
+            transform: translateY(6px) scaleY(0.94);
+        }
+
+        /* Эффект при наведении */
+        .btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(102, 126, 234, 0.1);
+            border-radius: 30px;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            pointer-events: none;
+        }
+
+        .btn:hover::before {
+            opacity: 1;
+        }
+
+        h1 {
+            color: white;
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            font-size: 24px;
+        }
+
+        .info {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: white;
+            text-align: center;
+            font-size: 14px;
+            opacity: 0.8;
+        }
+    </style>
+</head>
+<body>
+    <h1>Прямоугольная кнопка</h1>
+
+    <div class="button-container">
+        <button class="btn"></button>
+    </div>
+
+    <div class="info">
+        <p>✨ Наводи курсор и нажимай на кнопку</p>
+        <p>Почувствуй объемный 3D эффект!</p>
+    </div>
+</body>
+</html>

@@ -1,0 +1,10 @@
+{
+  "name": "stil-tvoy-shag-po-zhizni",
+  "private": true,
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "2.112.3"
+  }
+}

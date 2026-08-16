@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="ru" data-theme="light">
+<head>
+<meta charset="utf-8">
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Выдача кода — служебная страница</title>
+<meta name="robots" content="noindex, nofollow">
+
+<link rel="stylesheet" href="css/tokens.css?v=7">
+<link rel="stylesheet" href="css/base.css?v=2">
+<link rel="stylesheet" href="css/components/button-3d.css?v=3">
+<link rel="stylesheet" href="css/cabinet.css?v=1">
+<style>
+  body { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 24px; }
+  .admin-card { max-width: 480px; width: 100%; padding: 32px; border-radius: 18px; background: rgba(255,255,255,.55); border: 1px solid var(--glow-silver); }
+  .admin-card h1 { font-family: var(--font-display); font-size: 1.5rem; font-weight: 500; margin: 0 0 8px; }
+  .admin-card p { font-family: var(--font-body); color: var(--text-muted); font-size: .92rem; line-height: 1.6; margin: 0 0 20px; }
+  .admin-field { margin-bottom: 14px; }
+  .admin-field label { display: block; font-family: var(--font-body); font-size: .82rem; color: var(--text-muted); margin-bottom: 6px; }
+  .admin-field input { width: 100%; box-sizing: border-box; padding: 12px 16px; border-radius: 12px; border: 1px solid var(--glow-silver); background: rgba(255,255,255,.6); font-family: var(--font-body); font-size: .96rem; color: var(--text-primary); }
+  .admin-result { margin-top: 18px; padding: 14px 16px; border-radius: 12px; background: rgba(255,255,255,.6); border: 1px solid var(--glow-silver); font-family: var(--font-body); font-size: 1.05rem; letter-spacing: .04em; word-break: break-all; display: none; }
+  .admin-result.is-error { color: #b23b3b; }
+  .admin-card .btn-3d { width: 100%; margin-top: 4px; }
+</style>
+</head>
+<body>
+
+<div class="admin-card">
+  <h1>Выдача кода «Примерки»</h1>
+  <p>
+    Служебная страница, не для покупателей — не ссылается ниоткуда на сайте. Введите админ-ключ
+    (тот же, что в переменной окружения <code>ADMIN_KEY</code>) и любую метку для себя (например,
+    имя партнёра или дату) — код можно скопировать и передать продавцу или покупателю.
+  </p>
+
+  <form id="genForm">
+    <div class="admin-field">
+      <label for="adminKey">Админ-ключ</label>
+      <input type="password" id="adminKey" autocomplete="off">
+    </div>
+    <div class="admin-field">
+      <label for="refInput">Метка (необязательно)</label>
+      <input type="text" id="refInput" placeholder="Например: ANNA-12AVG" autocomplete="off">
+    </div>
+    <button type="submit" class="btn-3d btn-3d--rect">Сгенерировать код</button>
+  </form>
+
+  <div class="admin-result" id="genResult"></div>
+</div>
+
+<script>
+(function () {
+  var form = document.getElementById('genForm');
+  var resultBox = document.getElementById('genResult');
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var adminKey = document.getElementById('adminKey').value;
+    var ref = document.getElementById('refInput').value;
+    resultBox.className = 'admin-result';
+    resultBox.style.display = 'block';
+    resultBox.textContent = 'Генерирую…';
+    fetch('api/generate-code', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ adminKey: adminKey, ref: ref })
+    })
+      .then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); })
+      .then(function (r) {
+        if (!r.ok) throw new Error(r.data.error || 'Не получилось сгенерировать код.');
+        resultBox.textContent = r.data.code;
+      })
+      .catch(function (err) {
+        resultBox.className = 'admin-result is-error';
+        resultBox.textContent = err.message;
+      });
+  });
+})();
+</script>
+
+</body>
+</html>

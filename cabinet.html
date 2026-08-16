@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="ru" data-theme="light">
+<head>
+<meta charset="utf-8">
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Личный кабинет — Стиль</title>
+<meta name="description" content="Ваш гардероб и статус примерок. Демо-кабинет: данные хранятся в этом браузере, реальная авторизация появится позже.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Личный кабинет — Стиль">
+<meta property="og:description" content="Ваш гардероб и статус примерок. Демо-кабинет: данные хранятся в этом браузере, реальная авторизация появится позже.">
+<meta property="og:image" content="assets/WKnaQxw-vzS6oO1OZq5uZ_5R9gOm7j.webp">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Личный кабинет — Стиль">
+<meta name="twitter:description" content="Ваш гардероб и статус примерок. Демо-кабинет: данные хранятся в этом браузере, реальная авторизация появится позже.">
+<meta name="twitter:image" content="assets/WKnaQxw-vzS6oO1OZq5uZ_5R9gOm7j.webp">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,400;1,500&family=Montserrat:wght@300;400;500&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="css/tokens.css?v=7">
+<link rel="stylesheet" href="css/base.css?v=2">
+<link rel="stylesheet" href="css/components/button-3d.css?v=3">
+<link rel="stylesheet" href="css/inner.css?v=16">
+<link rel="stylesheet" href="css/cabinet.css?v=1">
+</head>
+<body>
+
+<header class="page-header">
+  <a href="index.html" class="page-header__mark">СТИЛЬ</a>
+  <nav class="page-header__nav">
+    <a href="how-it-works.html">Как это работает</a>
+    <a href="online-stylist.html">Онлайн-стилист</a>
+    <a href="primerka.html">Примерка</a>
+    <a href="prices.html">Цены</a>
+    <a href="faq.html">FAQ</a>
+  </nav>
+</header>
+
+<main>
+
+  <section class="page-hero">
+    <span class="page-hero__eyebrow">Личный кабинет</span>
+    <h1>Ваш гардероб<br>и статус примерок</h1>
+    <p class="page-hero__lead">
+      Вход и баланс — настоящие, через личный аккаунт. Гардероб и статус примерок пока хранятся
+      только в этом браузере, без привязки к аккаунту.
+    </p>
+  </section>
+
+  <section class="page-section" id="authSection">
+    <h2 class="page-section__title">Вход</h2>
+    <div id="authLoggedOut">
+      <p class="section-note">
+        Чтобы пополнить баланс и оплачивать услуги с депозита, войдите по email — пароль не нужен,
+        пришлём одноразовую ссылку для входа.
+      </p>
+      <form class="wardrobe-add" id="loginForm">
+        <input type="email" id="loginEmail" placeholder="you@example.com" autocomplete="email" required>
+        <button type="submit" class="btn-3d btn-3d--rect">Прислать ссылку</button>
+      </form>
+      <div id="loginMsg" class="cabinet-status__msg" style="display:none"></div>
+    </div>
+    <div id="authLoggedIn" style="display:none">
+      <p class="section-note">Вы вошли как <strong id="authEmail"></strong>. <button type="button" id="logoutBtn" class="cabinet-link-btn">Выйти</button></p>
+    </div>
+  </section>
+
+  <section class="page-section" id="walletSection" style="display:none">
+    <h2 class="page-section__title">Баланс</h2>
+    <div class="cabinet-status">
+      <div class="cabinet-status__count" id="walletBalance">—</div>
+      <p class="cabinet-status__msg">Депозит списывается автоматически при оплате консультации виртуального стилиста или «Примерки».</p>
+    </div>
+    <form class="wardrobe-add" id="topupForm">
+      <input type="number" id="topupAmount" min="100" step="1" placeholder="Сумма пополнения, ₽" autocomplete="off">
+      <button type="submit" class="btn-3d btn-3d--rect">Пополнить</button>
+    </form>
+    <div id="topupMsg" class="cabinet-status__msg" style="display:none"></div>
+
+    <h3>История операций</h3>
+    <ul class="wardrobe-list" id="walletHistory"></ul>
+  </section>
+
+  <section class="page-section">
+    <h2 class="page-section__title">Статус примерок</h2>
+    <div class="cabinet-status" id="cabinetStatus"></div>
+  </section>
+
+  <section class="page-section">
+    <h2 class="page-section__title">Код от партнёра</h2>
+    <p class="section-note">
+      Купили вещь у партнёра — продавец сам расскажет о программе и даст вам код. Введите его здесь,
+      и скидка на следующую примерку включится автоматически, без переходов и подтверждений.
+    </p>
+    <form class="wardrobe-add" id="codeForm">
+      <input type="text" id="codeInput" placeholder="Например: STIL-ANNA1-7F3K9QXM" autocomplete="off">
+      <button type="submit" class="btn-3d btn-3d--rect">Активировать</button>
+    </form>
+    <div id="codeMsg"></div>
+  </section>
+
+  <section class="page-section">
+    <h2 class="page-section__title">Мой гардероб</h2>
+    <form class="wardrobe-add" id="wardrobeAddForm">
+      <input type="text" id="wardrobeInput" placeholder="Например: чёрные лодочки" autocomplete="off">
+      <button type="submit" class="btn-3d btn-3d--rect">Добавить</button>
+    </form>
+    <div class="wardrobe-columns">
+      <div class="wardrobe-col">
+        <h3>Уже есть</h3>
+        <ul class="wardrobe-list" id="wardrobeHave"></ul>
+      </div>
+      <div class="wardrobe-col">
+        <h3>Нужно докупить</h3>
+        <ul class="wardrobe-list" id="wardrobeNeed"></ul>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="site-footer">
+  <div class="site-footer__grid">
+    <div class="site-footer__col">
+      <h4>Продукт</h4>
+      <a href="how-it-works.html">Как это работает</a>
+      <a href="online-stylist.html">Онлайн-стилист</a>
+      <a href="primerka.html">Программа «Примерка»</a>
+      <a href="prices.html">Цены</a>
+      <a href="cabinet.html">Личный кабинет</a>
+    </div>
+    <div class="site-footer__col">
+      <h4>Помощь</h4>
+      <a href="faq.html">FAQ</a>
+      <a href="about.html">О проекте</a>
+      <a href="structure.html">Карта сайта</a>
+    </div>
+    <div class="site-footer__col">
+      <h4>Юридическое</h4>
+      <a href="legal-agreement.html">Пользовательское соглашение</a>
+      <a href="legal-privacy.html">Политика конфиденциальности</a>
+      <a href="legal-offer.html">Публичная оферта</a>
+      <a href="legal-partners.html">Партнёрское соглашение</a>
+    </div>
+  </div>
+  <div class="site-footer__bottom">
+    <a href="index.html">← На главную</a>
+  </div>
+</footer>
+
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+<script src="js/wallet.js"></script>
+<script src="js/cabinet.js"></script>
+<script src="js/nav-active.js"></script>
+</body>
+</html>

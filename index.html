@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Стиль — твой шаг по жизни</title>
+<meta name="description" content="Персональный онлайн-стилист: соберём для вас образ по слоям вокруг любой вещи — купленной у партнёра или просто вашей. Первый образ — бесплатно.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Стиль — твой шаг по жизни">
+<meta property="og:description" content="Персональный онлайн-стилист: соберём для вас образ по слоям вокруг любой вещи — купленной у партнёра или просто вашей. Первый образ — бесплатно.">
+<meta property="og:image" content="assets/WKnaQxw-vzS6oO1OZq5uZ_5R9gOm7j.webp">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Стиль — твой шаг по жизни">
+<meta name="twitter:description" content="Персональный онлайн-стилист: соберём для вас образ по слоям вокруг любой вещи — купленной у партнёра или просто вашей. Первый образ — бесплатно.">
+<meta name="twitter:image" content="assets/WKnaQxw-vzS6oO1OZq5uZ_5R9gOm7j.webp">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,400&family=Montserrat:wght@300;400;500&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="css/tokens.css?v=7">
+<link rel="stylesheet" href="css/base.css?v=2">
+<link rel="stylesheet" href="css/components/button-3d.css?v=3">
+<link rel="stylesheet" href="css/home.css?v=5">
+</head>
+<body>
+
+<div id="scene">
+
+  <!-- ================= КОСМИЧЕСКИЙ ФОН: звёзды + созвездия ================= -->
+  <svg id="cosmic-bg" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" aria-hidden="true" focusable="false">
+    <defs>
+      <radialGradient id="vignette" cx="50%" cy="18%" r="70%">
+        <stop offset="0%" stop-color="#2a1f52" stop-opacity="0.5"/>
+        <stop offset="45%" stop-color="#0d1033" stop-opacity="0.22"/>
+        <stop offset="100%" stop-color="#05061a" stop-opacity="0"/>
+      </radialGradient>
+    </defs>
+    <rect x="0" y="0" width="1600" height="520" fill="url(#vignette)"/>
+
+    <g class="constellations">
+      <line x1="231.3" y1="124.7" x2="308.9" y2="91.3" class="constellation-line"/>
+      <line x1="308.9" y1="91.3" x2="267.6" y2="179.1" class="constellation-line"/>
+      <line x1="267.6" y1="179.1" x2="272.3" y2="110.6" class="constellation-line"/>
+      <line x1="272.3" y1="110.6" x2="224.1" y2="151.1" class="constellation-line"/>
+      <line x1="1288.5" y1="292.0" x2="1398.0" y2="181.1" class="constellation-line"/>
+      <line x1="1398.0" y1="181.1" x2="1324.2" y2="241.9" class="constellation-line"/>
+      <line x1="1324.2" y1="241.9" x2="1348.0" y2="309.5" class="constellation-line"/>
+      <line x1="1348.0" y1="309.5" x2="1241.6" y2="162.2" class="constellation-line"/>
+      <line x1="1241.6" y1="162.2" x2="1332.1" y2="151.4" class="constellation-line"/>
+      <line x1="124.5" y1="627.8" x2="95.5" y2="691.6" class="constellation-line"/>
+      <line x1="95.5" y1="691.6" x2="195.9" y2="664.5" class="constellation-line"/>
+      <line x1="195.9" y1="664.5" x2="134.4" y2="735.2" class="constellation-line"/>
+      <line x1="134.4" y1="735.2" x2="214.5" y2="692.2" class="constellation-line"/>
+      <line x1="1415.6" y1="760.5" x2="1434.7" y2="703.8" class="constellation-line"/>
+      <line x1="1434.7" y1="703.8" x2="1410.6" y2="762.4" class="constellation-line"/>
+      <line x1="1410.6" y1="762.4" x2="1365.8" y2="688.5" class="constellation-line"/>
+      <line x1="1365.8" y1="688.5" x2="1408.1" y2="757.6" class="constellation-line"/>
+      <line x1="805.7" y1="50.0" x2="713.2" y2="83.1" class="constellation-line"/>
+      <line x1="713.2" y1="83.1" x2="794.9" y2="119.7" class="constellation-line"/>
+      <line x1="794.9" y1="119.7" x2="730.4" y2="57.4" class="constellation-line"/>
+      <circle cx="231.3" cy="124.7" r="1.6" class="constellation-star"/>
+      <circle cx="308.9" cy="91.3" r="1.6" class="constellation-star"/>
+      <circle cx="267.6" cy="179.1" r="1.6" class="constellation-star"/>
+      <circle cx="272.3" cy="110.6" r="1.6" class="constellation-star"/>
+      <circle cx="224.1" cy="151.1" r="1.6" class="constellation-star"/>
+      <circle cx="1288.5" cy="292.0" r="1.6" class="constellation-star"/>
+      <circle cx="1398.0" cy="181.1" r="1.6" class="constellation-star"/>
+      <circle cx="1324.2" cy="241.9" r="1.6" class="constellation-star"/>
+      <circle cx="1348.0" cy="309.5" r="1.6" class="constellation-star"/>
+      <circle cx="1241.6" cy="162.2" r="1.6" class="constellation-star"/>
+      <circle cx="1332.1" cy="151.4" r="1.6" class="constellation-star"/>
+      <circle cx="124.5" cy="627.8" r="1.6" class="constellation-star"/>
+      <circle cx="95.5" cy="691.6" r="1.6" class="constellation-star"/>
+      <circle cx="195.9" cy="664.5" r="1.6" class="constellation-star"/>
+      <circle cx="134.4" cy="735.2" r="1.6" class="constellation-star"/>
+      <circle cx="214.5" cy="692.2" r="1.6" class="constellation-star"/>
+      <circle cx="1415.6" cy="760.5" r="1.6" class="constellation-star"/>
+      <circle cx="1434.7" cy="703.8" r="1.6" class="constellation-star"/>
+      <circle cx="1410.6" cy="762.4" r="1.6" class="constellation-star"/>
+      <circle cx="1365.8" cy="688.5" r="1.6" class="constellation-star"/>
+      <circle cx="1408.1" cy="757.6" r="1.6" class="constellation-star"/>
+      <circle cx="805.7" cy="50.0" r="1.6" class="constellation-star"/>
+      <circle cx="713.2" cy="83.1" r="1.6" class="constellation-star"/>
+      <circle cx="794.9" cy="119.7" r="1.6" class="constellation-star"/>
+      <circle cx="730.4" cy="57.4" r="1.6" class="constellation-star"/>
+    </g>
+
+    <g class="stars">
+      <circle class="star" cx="1023.1" cy="22.5" r="0.99" style="--d:1.34s;--dur:6.08s"/>
+      <circle class="star" cx="1427.5" cy="78.2" r="1.19" style="--d:0.18s;--dur:4.27s"/>
+      <circle class="star" cx="42.5" cy="179.0" r="1.51" style="--d:3.27s;--dur:4.27s"/>
+      <circle class="star star--gold" cx="1295.1" cy="5.8" r="1.73" style="--d:4.19s;--dur:4.69s"/>
+      <circle class="star" cx="1531.5" cy="302.9" r="0.73" style="--d:0.58s;--dur:6.47s"/>
+      <circle class="star" cx="1291.4" cy="656.8" r="1.35" style="--d:5.84s;--dur:4.82s"/>
+      <circle class="star star--gold" cx="1327.0" cy="556.7" r="1.81" style="--d:3.46s;--dur:5.97s"/>
+      <circle class="star" cx="364.6" cy="260.4" r="0.71" style="--d:1.4s;--dur:3.85s"/>
+      <circle class="star" cx="1017.1" cy="328.3" r="1.12" style="--d:1.26s;--dur:4.43s"/>
+      <circle class="star" cx="1036.9" cy="548.2" r="0.84" style="--d:4.37s;--dur:4.07s"/>
+      <circle class="star" cx="1583.2" cy="576.0" r="1.38" style="--d:4.11s;--dur:6.45s"/>
+      <circle class="star" cx="366.5" cy="28.9" r="1.04" style="--d:1.61s;--dur:4.24s"/>
+      <circle class="star" cx="1402.2" cy="283.2" r="1.52" style="--d:2.37s;--dur:6.7s"/>
+      <circle class="star" cx="423.8" cy="222.0" r="1.39" style="--d:1.58s;--dur:5.55s"/>
+      <circle class="star star--gold" cx="639.0" cy="197.4" r="2.0" style="--d:3.06s;--dur:3.82s"/>
+      <circle class="star" cx="175.4" cy="564.7" r="1.71" style="--d:2.53s;--dur:3.72s"/>
+      <circle class="star" cx="1593.8" cy="476.2" r="1.96" style="--d:5.16s;--dur:3.54s"/>
+      <circle class="star" cx="1090.7" cy="483.3" r="0.97" style="--d:3.85s;--dur:3.89s"/>
+      <circle class="star star--gold" cx="726.0" cy="858.4" r="1.83" style="--d:1.58s;--dur:5.25s"/>
+      <circle class="star star--gold" cx="1460.2" cy="783.5" r="1.02" style="--d:3.83s;--dur:5.63s"/>
+      <circle class="star" cx="1220.0" cy="485.4" r="1.69" style="--d:3.18s;--dur:3.5s"/>
+      <circle class="star star--gold" cx="31.2" cy="836.2" r="1.83" style="--d:4.99s;--dur:4.58s"/>
+      <circle class="star" cx="1404.8" cy="852.3" r="0.72" style="--d:2.92s;--dur:3.74s"/>
+      <circle class="star" cx="1225.3" cy="115.6" r="1.27" style="--d:3.3s;--dur:4.43s"/>
+      <circle class="star" cx="677.0" cy="190.6" r="1.36" style="--d:4.38s;--dur:4.2s"/>
+      <circle class="star" cx="1592.2" cy="584.9" r="1.21" style="--d:3.11s;--dur:3.92s"/>
+      <circle class="star" cx="540.9" cy="529.5" r="0.92" style="--d:1.32s;--dur:3.75s"/>
+      <circle class="star" cx="366.3" cy="814.9" r="1.8" style="--d:0.43s;--dur:4.33s"/>
+      <circle class="star" cx="342.8" cy="119.1" r="1.91" style="--d:3.43s;--dur:5.15s"/>
+      <circle class="star" cx="1292.0" cy="171.4" r="0.74" style="--d:2.59s;--dur:4.98s"/>
+      <circle class="star" cx="1166.5" cy="606.0" r="1.98" style="--d:0.59s;--dur:4.91s"/>
+      <circle class="star" cx="1378.7" cy="223.8" r="0.87" style="--d:2.69s;--dur:4.98s"/>
+      <circle class="star star--gold" cx="399.7" cy="830.9" r="1.22" style="--d:5.17s;--dur:5.43s"/>
+      <circle class="star star--gold" cx="1598.9" cy="752.4" r="1.96" style="--d:5.56s;--dur:6.47s"/>
+      <circle class="star" cx="777.0" cy="192.4" r="1.16" style="--d:0.35s;--dur:4.83s"/>
+      <circle class="star" cx="424.3" cy="705.7" r="1.24" style="--d:2.54s;--dur:6.85s"/>
+      <circle class="star" cx="889.2" cy="646.6" r="0.82" style="--d:1.78s;--dur:6.89s"/>
+      <circle class="star" cx="867.5" cy="673.2" r="0.68" style="--d:3.51s;--dur:5.26s"/>
+      <circle class="star" cx="251.9" cy="864.7" r="0.71" style="--d:1.11s;--dur:5.58s"/>
+      <circle class="star" cx="376.3" cy="107.9" r="1.85" style="--d:1.48s;--dur:5.58s"/>
+      <circle class="star" cx="670.8" cy="525.3" r="1.33" style="--d:5.61s;--dur:4.21s"/>
+      <circle class="star" cx="381.9" cy="356.2" r="1.54" style="--d:1.8s;--dur:4.61s"/>
+      <circle class="star star--gold" cx="116.1" cy="412.5" r="2.0" style="--d:5.98s;--dur:3.76s"/>
+      <circle class="star star--gold" cx="424.3" cy="839.9" r="1.83" style="--d:5.28s;--dur:4.79s"/>
+      <circle class="star star--gold" cx="1334.0" cy="633.2" r="1.46" style="--d:5.92s;--dur:5.79s"/>
+      <circle class="star star--gold" cx="1307.4" cy="269.4" r="1.53" style="--d:5.63s;--dur:3.97s"/>
+      <circle class="star star--gold" cx="171.3" cy="497.9" r="0.98" style="--d:3.63s;--dur:6.01s"/>
+      <circle class="star star--gold" cx="1014.8" cy="237.6" r="1.28" style="--d:5.43s;--dur:6.46s"/>
+      <circle class="star" cx="677.7" cy="249.0" r="0.6" style="--d:4.63s;--dur:5.73s"/>
+      <circle class="star" cx="1186.0" cy="496.5" r="1.2" style="--d:0.06s;--dur:3.76s"/>
+      <circle class="star star--gold" cx="1446.3" cy="491.0" r="1.77" style="--d:3.5s;--dur:4.02s"/>
+      <circle class="star star--gold" cx="493.2" cy="809.1" r="1.71" style="--d:5.16s;--dur:6.65s"/>
+      <circle class="star" cx="399.2" cy="92.5" r="1.69" style="--d:5.3s;--dur:4.92s"/>
+      <circle class="star" cx="247.3" cy="836.9" r="1.81" style="--d:5.86s;--dur:6.34s"/>
+      <circle class="star" cx="39.7" cy="662.9" r="1.07" style="--d:5.58s;--dur:6.31s"/>
+      <circle class="star" cx="1297.2" cy="240.1" r="1.7" style="--d:0.65s;--dur:6.55s"/>
+      <circle class="star" cx="355.9" cy="734.9" r="1.24" style="--d:1.83s;--dur:6.28s"/>
+      <circle class="star" cx="37.9" cy="173.8" r="1.06" style="--d:5.19s;--dur:6.88s"/>
+      <circle class="star star--gold" cx="1026.4" cy="359.7" r="1.97" style="--d:3.22s;--dur:6.79s"/>
+      <circle class="star" cx="1552.6" cy="160.7" r="1.95" style="--d:1.59s;--dur:3.88s"/>
+      <circle class="star" cx="1165.7" cy="282.3" r="1.45" style="--d:3.07s;--dur:4.85s"/>
+      <circle class="star" cx="407.6" cy="637.9" r="0.6" style="--d:5.55s;--dur:5.38s"/>
+      <circle class="star" cx="1187.1" cy="603.6" r="1.11" style="--d:0.42s;--dur:5.82s"/>
+      <circle class="star" cx="502.3" cy="763.2" r="1.61" style="--d:1.8s;--dur:4.58s"/>
+      <circle class="star" cx="643.8" cy="266.1" r="0.78" style="--d:2.52s;--dur:6.79s"/>
+      <circle class="star" cx="1444.5" cy="554.0" r="1.02" style="--d:3.29s;--dur:3.5s"/>
+      <circle class="star star--gold" cx="687.8" cy="522.0" r="1.52" style="--d:2.79s;--dur:5.05s"/>
+      <circle class="star" cx="757.1" cy="811.1" r="1.71" style="--d:1.02s;--dur:3.8s"/>
+      <circle class="star" cx="1012.7" cy="301.7" r="1.75" style="--d:4.51s;--dur:5.85s"/>
+      <circle class="star star--gold" cx="318.6" cy="22.0" r="0.94" style="--d:2.85s;--dur:6.47s"/>
+      <circle class="star" cx="663.1" cy="566.8" r="0.87" style="--d:4.18s;--dur:5.23s"/>
+      <circle class="star" cx="1049.7" cy="5.0" r="1.65" style="--d:4.62s;--dur:3.87s"/>
+      <circle class="star" cx="281.4" cy="862.2" r="1.33" style="--d:0.3s;--dur:4.37s"/>
+      <circle class="star" cx="730.3" cy="721.3" r="1.53" style="--d:5.93s;--dur:5.58s"/>
+      <circle class="star" cx="1426.3" cy="551.4" r="1.61" style="--d:3.03s;--dur:6.41s"/>
+      <circle class="star" cx="1435.5" cy="669.3" r="1.26" style="--d:1.56s;--dur:4.37s"/>
+      <circle class="star" cx="1225.3" cy="469.2" r="1.48" style="--d:1.65s;--dur:3.77s"/>
+      <circle class="star" cx="434.7" cy="287.7" r="1.36" style="--d:0.83s;--dur:4.31s"/>
+      <circle class="star star--gold" cx="1130.3" cy="57.8" r="1.17" style="--d:3.26s;--dur:4.96s"/>
+      <circle class="star" cx="672.2" cy="814.4" r="1.42" style="--d:4.17s;--dur:6.5s"/>
+      <circle class="star" cx="608.6" cy="5.3" r="1.09" style="--d:4.52s;--dur:6.49s"/>
+      <circle class="star star--gold" cx="670.4" cy="672.8" r="1.36" style="--d:3.62s;--dur:4.27s"/>
+      <circle class="star star--gold" cx="697.3" cy="26.1" r="1.07" style="--d:4.07s;--dur:4.92s"/>
+      <circle class="star" cx="747.8" cy="114.9" r="1.47" style="--d:0.16s;--dur:4.88s"/>
+      <circle class="star" cx="43.4" cy="578.5" r="0.79" style="--d:2.77s;--dur:3.68s"/>
+      <circle class="star" cx="338.7" cy="294.2" r="1.67" style="--d:2.27s;--dur:6.13s"/>
+      <circle class="star" cx="403.6" cy="73.7" r="0.63" style="--d:3.24s;--dur:7.0s"/>
+      <circle class="star star--gold" cx="1040.2" cy="703.1" r="1.51" style="--d:4.53s;--dur:6.82s"/>
+      <circle class="star star--gold" cx="32.6" cy="137.1" r="0.78" style="--d:4.02s;--dur:5.47s"/>
+      <circle class="star star--gold" cx="1119.1" cy="690.2" r="0.83" style="--d:3.64s;--dur:6.12s"/>
+      <circle class="star" cx="1310.9" cy="868.2" r="0.75" style="--d:0.15s;--dur:4.59s"/>
+      <circle class="star" cx="1533.1" cy="357.0" r="1.6" style="--d:0.46s;--dur:5.92s"/>
+      <circle class="star" cx="163.0" cy="695.2" r="1.79" style="--d:3.6s;--dur:3.92s"/>
+      <circle class="star" cx="1252.2" cy="312.5" r="1.2" style="--d:2.22s;--dur:5.27s"/>
+      <circle class="star" cx="1359.3" cy="740.1" r="0.75" style="--d:5.76s;--dur:5.72s"/>
+      <circle class="star" cx="1131.7" cy="391.9" r="1.63" style="--d:5.79s;--dur:4.45s"/>
+      <circle class="star" cx="861.1" cy="435.1" r="1.21" style="--d:4.39s;--dur:4.44s"/>
+      <circle class="star" cx="1329.2" cy="78.0" r="1.83" style="--d:1.46s;--dur:5.13s"/>
+      <circle class="star" cx="606.4" cy="25.8" r="1.79" style="--d:1.09s;--dur:4.24s"/>
+      <circle class="star" cx="544.5" cy="792.3" r="1.58" style="--d:1.66s;--dur:3.54s"/>
+      <circle class="star" cx="137.0" cy="648.1" r="1.28" style="--d:4.55s;--dur:5.92s"/>
+      <circle class="star" cx="785.3" cy="713.6" r="0.73" style="--d:1.33s;--dur:5.92s"/>
+      <circle class="star" cx="930.5" cy="425.9" r="1.34" style="--d:2.55s;--dur:6.11s"/>
+      <circle class="star star--gold" cx="1124.6" cy="243.8" r="0.95" style="--d:0.72s;--dur:4.17s"/>
+      <circle class="star" cx="857.4" cy="686.0" r="0.86" style="--d:1.3s;--dur:5.19s"/>
+      <circle class="star" cx="1562.6" cy="472.2" r="1.0" style="--d:0.6s;--dur:4.18s"/>
+      <circle class="star" cx="287.1" cy="12.7" r="1.35" style="--d:1.65s;--dur:6.91s"/>
+      <circle class="star" cx="1115.9" cy="113.7" r="1.82" style="--d:2.95s;--dur:6.55s"/>
+      <circle class="star" cx="751.0" cy="396.4" r="0.86" style="--d:0.31s;--dur:6.79s"/>
+      <circle class="star star--gold" cx="1315.4" cy="360.6" r="0.7" style="--d:3.78s;--dur:3.69s"/>
+    </g>
+  </svg>
+
+  <canvas id="comet-canvas" aria-hidden="true"></canvas>
+
+  <div class="fig-scatter" aria-hidden="true">
+    <img class="fig-silhouette fig-silhouette--1" src="assets/silhouette/fig-1.png" alt="">
+    <img class="fig-silhouette fig-silhouette--2" src="assets/silhouette/fig-2.png" alt="">
+    <img class="fig-silhouette fig-silhouette--3" src="assets/silhouette/fig-3.png" alt="">
+    <img class="fig-silhouette fig-silhouette--4" src="assets/silhouette/fig-4.png" alt="">
+  </div>
+
+  <!-- ================= ШАПКА ================= -->
+  <header class="site-header">
+    <span class="site-header__mark">СТИЛЬ</span>
+    <span class="site-header__tag">твой шаг по жизни</span>
+  </header>
+
+  <!-- ================= ЗАГОЛОВОК ================= -->
+  <h1 class="reveal-text">
+    <span class="reveal-text__inner">
+      <span class="reveal-line">Войди</span>
+      <span class="reveal-line">в жизнь</span>
+      <span class="reveal-line">со стилем</span>
+    </span>
+  </h1>
+
+  <!-- ================= ФИНАЛЬНАЯ КНОПКА ================= -->
+  <div class="final-cta">
+    <a href="how-it-works.html" class="btn-3d btn-3d--rect">Как это работает</a>
+    <a href="structure.html" class="final-cta__secondary">Структура сайта</a>
+  </div>
+
+</div>
+
+<script src="js/starfield.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
