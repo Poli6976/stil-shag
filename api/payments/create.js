@@ -2,16 +2,15 @@
    POST /api/payments/create — начать пополнение депозита.
 
    Требует залогиненного пользователя (Supabase JWT в Authorization: Bearer).
-   Создаёт платёжную ссылку в Prodamus и сохраняет запись в таблице payments
+   Создаёт платёжную ссылку в Robokassa и сохраняет запись в таблице payments
    со статусом pending — окончательное зачисление на баланс происходит только
    в api/payments/webhook.js, и только после проверки подписи уведомления
-   (см. lib/payments/prodamus.js).
+   (см. lib/payments/robokassa.js).
    ============================================================================ */
 
-const crypto = require('crypto');
 const { requireUser } = require('../../lib/auth');
 const { getSupabaseAdmin } = require('../../lib/supabaseAdmin');
-const { createPaymentLink } = require('../../lib/payments/prodamus');
+const { createPaymentLink } = require('../../lib/payments/robokassa');
 
 const MIN_TOPUP_KOPECKS = 10000;    // 100 ₽ — не пускаем совсем мелкие/тестовые платежи
 const MAX_TOPUP_KOPECKS = 30000000; // 300 000 ₽ — разумный потолок за один платёж
@@ -21,7 +20,7 @@ module.exports = async function handler(req, res) {
     res.status(405).json({ error: 'Только POST' });
     return;
   }
-  if (!process.env.PRODAMUS_SHOP_URL || !process.env.PRODAMUS_SECRET_KEY) {
+  if (!process.env.ROBOKASSA_MERCHANT_LOGIN || !process.env.ROBOKASSA_PASSWORD1) {
     res.status(503).json({ error: 'Оплата пока не настроена на сервере.' });
     return;
   }
@@ -41,27 +40,20 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    var returnUrl = (process.env.SITE_URL || ('https://' + req.headers.host)) + '/cabinet.html';
-    var notificationUrl = (process.env.SITE_URL || ('https://' + req.headers.host)) + '/api/payments/webhook';
-    var orderId = crypto.randomUUID();
-
     var payment = await createPaymentLink({
-      orderId: orderId,
       amountKopecks: amountKopecks,
       description: 'Пополнение баланса — Стиль',
-      returnUrl: returnUrl,
-      notificationUrl: notificationUrl,
       customerEmail: user.email
     });
 
     var supabase = getSupabaseAdmin();
     var insertResult = await supabase.from('payments').insert({
       user_id: user.id,
-      provider: 'prodamus',
-      provider_payment_id: orderId,
+      provider: 'robokassa',
+      provider_payment_id: payment.orderId,
       amount_kopecks: amountKopecks,
       status: 'pending',
-      raw_payload: { orderId: orderId, link: payment.link }
+      raw_payload: { orderId: payment.orderId, link: payment.link }
     });
     if (insertResult.error) throw insertResult.error;
 

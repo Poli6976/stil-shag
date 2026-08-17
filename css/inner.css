@@ -366,6 +366,18 @@ main {
   border-color: var(--glow-gold);
 }
 
+.site-footer__legal {
+  font-family: var(--font-body);
+  font-size: var(--fs-small);
+  color: var(--text-muted);
+  margin: 0 0 12px;
+}
+
+.site-footer__legal a {
+  color: inherit;
+  text-decoration: underline;
+}
+
 @media (max-width: 640px) {
   .site-footer__grid {
     grid-template-columns: 1fr 1fr;

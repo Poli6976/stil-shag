@@ -44,7 +44,7 @@ create index if not exists wallet_transactions_user_created_idx
 create table if not exists public.payments (
   id                    uuid primary key default gen_random_uuid(),
   user_id               uuid not null references auth.users(id) on delete cascade,
-  provider              text not null default 'prodamus',
+  provider              text not null default 'robokassa',
   provider_payment_id   text not null,
   amount_kopecks        bigint not null check (amount_kopecks > 0),
   status                text not null default 'pending'
@@ -116,8 +116,8 @@ create trigger on_auth_user_created
 
 -- ---------------------------------------------------------------------------
 -- Зачисление депозита — вызывается из api/payments/webhook.js после того,
--- как подпись уведомления Prodamus прошла проверку (см.
--- lib/payments/prodamus.js). Идемпотентно: если платёж уже не в статусе
+-- как подпись уведомления Robokassa прошла проверку (см.
+-- lib/payments/robokassa.js). Идемпотентно: если платёж уже не в статусе
 -- 'pending', функция просто ничего не делает и возвращает NULL — повторный
 -- вебхук не задвоит зачисление.
 -- ---------------------------------------------------------------------------
