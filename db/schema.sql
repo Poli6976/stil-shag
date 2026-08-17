@@ -361,3 +361,35 @@ alter table public.rate_limit_hits enable row level security;
 -- service_role через функцию выше — ни один пользователь не имеет к ней
 -- прямого доступа, даже на чтение своих строк (тут таких и нет — bucket
 -- обезличен и не привязан к конкретному аккаунту).
+
+-- ---------------------------------------------------------------------------
+-- Бесплатный первый образ — раньше учитывался только в браузере
+-- (localStorage 'stil.styleCount' в js/wizard.js), что не даёт реального
+-- учёта и легко обходится очисткой localStorage. Теперь один флаг на
+-- кошельке + атомарная функция: UPDATE ... WHERE free_look_used = false
+-- гарантирует, что даже два параллельных запроса от одного пользователя не
+-- смогут оба получить бесплатный образ. См. lib/lookAccess.js.
+-- ---------------------------------------------------------------------------
+
+alter table public.wallets add column if not exists free_look_used boolean not null default false;
+
+create or replace function public.consume_free_look(p_user_id uuid)
+returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_consumed boolean;
+begin
+  update public.wallets
+    set free_look_used = true, updated_at = now()
+    where user_id = p_user_id and free_look_used = false
+    returning true into v_consumed;
+
+  return coalesce(v_consumed, false);
+end;
+$$;
+
+revoke execute on function public.consume_free_look(uuid) from public;
+grant execute on function public.consume_free_look(uuid) to service_role;

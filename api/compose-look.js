@@ -18,9 +18,18 @@
    а не тихо сломается на середине:
      GIGACHAT_AUTH_KEY, GIGACHAT_SCOPE   — см. api/analyze-item.js
      YANDEX_API_KEY, YANDEX_FOLDER_ID    — см. lib/yandexart.js
+
+   Требует входа (Supabase JWT) и списывает право на образ — см.
+   lib/lookAccess.js. Проверка платёжеспособности (previewLookEntitlement) —
+   ДО вызова GigaChat/YandexART, чтобы не тратить деньги на генерацию для
+   того, кому нечем платить. Само списание (chargeForLook) — ПОСЛЕ успешной
+   генерации, чтобы неудачная попытка (например "нет человека на фото") не
+   съедала бесплатный образ или деньги впустую.
    ============================================================================ */
 
 const { checkRateLimit } = require('../lib/rateLimit');
+const { requireUser } = require('../lib/auth');
+const { previewLookEntitlement, chargeForLook } = require('../lib/lookAccess');
 const { getAccessToken, uploadFile, chatWithImage } = require('../lib/gigachat');
 const { generateLookImage } = require('../lib/yandexart');
 
@@ -92,9 +101,27 @@ module.exports = async function handler(req, res) {
     return;
   }
 
+  var user = await requireUser(req);
+  if (!user) {
+    res.status(401).json({ error: 'Нужно войти по email, чтобы собрать образ.' });
+    return;
+  }
+
   var allowed = await checkRateLimit(req, 'compose-look', { windowSeconds: 600, maxHits: 3 });
   if (!allowed) {
     res.status(429).json({ error: 'Слишком много запросов подряд. Попробуйте через несколько минут.' });
+    return;
+  }
+
+  try {
+    var entitled = await previewLookEntitlement(user.id);
+    if (!entitled) {
+      res.status(402).json({ error: 'Первый образ уже использован. Пополните баланс в личном кабинете, чтобы получить ещё один.' });
+      return;
+    }
+  } catch (err) {
+    console.error('compose-look entitlement check error:', err);
+    res.status(500).json({ error: 'Не получилось проверить доступ. Попробуйте ещё раз.' });
     return;
   }
 
@@ -133,6 +160,18 @@ module.exports = async function handler(req, res) {
 
     var parsed = parseLayers(raw);
     var imageBase64 = await generateLookImage(buildImagePrompt(parsed.layers, fit));
+
+    /* Списываем только сейчас, когда генерация реально удалась. Если это
+       спишет неудачно (крайне редкая гонка — баланс успели потратить между
+       previewLookEntitlement выше и этим моментом), картинка уже нарисована
+       и деньги за GigaChat/YandexART потрачены нами в любом случае — честнее
+       всё равно отдать результат пользователю, чем показать ошибку после
+       успешной генерации. Ошибку списания в этом случае просто логируем. */
+    try {
+      await chargeForLook(user.id);
+    } catch (chargeErr) {
+      console.error('compose-look: списание после успешной генерации не удалось:', chargeErr);
+    }
 
     res.status(200).json({
       layers: parsed.layers,

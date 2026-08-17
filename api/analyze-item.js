@@ -27,6 +27,7 @@
    ============================================================================ */
 
 const { checkRateLimit } = require('../lib/rateLimit');
+const { requireUser } = require('../lib/auth');
 const { getAccessToken, uploadFile, chatWithImage } = require('../lib/gigachat');
 
 const SYSTEM_PROMPT =
@@ -43,6 +44,12 @@ module.exports = async function handler(req, res) {
   }
   if (!process.env.GIGACHAT_AUTH_KEY) {
     res.status(503).json({ error: 'Разбор фото пока не настроен на сервере (нет GIGACHAT_AUTH_KEY).' });
+    return;
+  }
+
+  var user = await requireUser(req);
+  if (!user) {
+    res.status(401).json({ error: 'Нужно войти по email.' });
     return;
   }
 

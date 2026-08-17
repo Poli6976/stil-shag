@@ -23,7 +23,7 @@
 <link rel="stylesheet" href="css/base.css?v=2">
 <link rel="stylesheet" href="css/components/button-3d.css?v=3">
 <link rel="stylesheet" href="css/inner.css?v=16">
-<link rel="stylesheet" href="css/wizard.css?v=3">
+<link rel="stylesheet" href="css/wizard.css?v=4">
 </head>
 <body>
 
@@ -46,13 +46,10 @@
       Пара вопросов по одному за раз — и вы получите образ по слоям с объяснением, почему именно так.
       Первый раз — бесплатно, без покупки.
     </p>
-    <p class="page-hero__lead">
-      Уже сфотографировались в вещи? Попробуйте <a href="obraz-po-foto.html">образ по фото</a> —
-      загрузите своё фото, и ИИ-стилист соберёт и нарисует образ вокруг того, что на вас надето.
-    </p>
   </section>
   <div class="wizard-shell">
-    <div class="wizard-progress">
+    <div id="wizardAuthGate"></div>
+    <div class="wizard-progress" id="wizardProgressWrap" style="display:none">
       <span class="wizard-progress__label" id="wizardProgressLabel">Шаг 1 из 7</span>
       <div class="wizard-progress__bar"><div class="wizard-progress__fill" id="wizardProgressFill"></div></div>
     </div>
@@ -92,6 +89,8 @@
   </div>
 </footer>
 
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+<script src="js/auth-gate.js"></script>
 <script src="js/wizard.js"></script>
 <script src="js/nav-active.js"></script>
 </body>

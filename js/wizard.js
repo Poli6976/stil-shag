@@ -317,10 +317,12 @@
 
   var answers = {};
   var stepIndex = 0;
+  var currentSession = null;
 
   var root = document.getElementById('wizardStep');
   var progressLabel = document.getElementById('wizardProgressLabel');
   var progressFill = document.getElementById('wizardProgressFill');
+  var authGate = document.getElementById('wizardAuthGate');
 
   if (!root) return;
 
@@ -351,8 +353,46 @@
       render();
     } else {
       stepIndex = steps.length;
-      renderResult();
+      chargeAndRenderResult();
     }
+  }
+
+  /* Списывает право на образ (бесплатный первый / скидка / полная цена —
+     см. lib/lookAccess.js) и только при успехе показывает шаблон результата.
+     Сама генерация здесь бесплатна для нас (статичные шаблоны), но по
+     бизнес-правилу первый образ бесплатен всем, а дальше платно — поэтому
+     учёт нужен даже без реального ИИ-вызова. */
+  function chargeAndRenderResult() {
+    root.innerHTML = '';
+    root.appendChild(el('p', 'wizard-step__hint', 'Оформляем ваш образ…'));
+
+    fetch('api/looks/charge', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + currentSession.access_token }
+    })
+      .then(function (res) {
+        if (!res.ok) {
+          return res.json().catch(function () { return {}; }).then(function (data) {
+            var err = new Error(data.error || 'Не получилось оформить образ.');
+            err.status = res.status;
+            throw err;
+          });
+        }
+        return res.json();
+      })
+      .then(function () {
+        renderResult();
+      })
+      .catch(function (err) {
+        root.innerHTML = '';
+        root.appendChild(el('span', 'wizard-result__badge', err.status === 402 ? 'Нужна оплата' : 'Ошибка'));
+        root.appendChild(el('h2', null, err.status === 402 ? 'Первый образ уже использован' : 'Не получилось'));
+        root.appendChild(el('p', 'wizard-result__note', (err && err.message) || 'Попробуйте ещё раз.'));
+        var link = el('a', 'btn-3d btn-3d--rect', 'Пополнить баланс в кабинете');
+        link.href = 'cabinet.html';
+        root.appendChild(link);
+        renderRestartLinks();
+      });
   }
 
   function goBack() {
@@ -467,7 +507,10 @@
             photoStatus.textContent = 'Анализирую вещь на фото…';
             return fetch('api/analyze-item', {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + (currentSession ? currentSession.access_token : '')
+              },
               body: JSON.stringify({ image: dataUrl })
             });
           })
@@ -688,5 +731,14 @@
     });
   }
 
-  render();
+  if (authGate && window.stilAuthGate) {
+    window.stilAuthGate.renderGate(authGate, function (session) {
+      currentSession = session;
+      var progressWrap = document.getElementById('wizardProgressWrap');
+      if (progressWrap) progressWrap.style.display = '';
+      render();
+    });
+  } else {
+    render();
+  }
 })();

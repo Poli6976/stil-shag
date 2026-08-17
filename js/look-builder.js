@@ -7,9 +7,10 @@
   var LAYER_LABELS = ['Верх', 'Низ', 'Верхняя одежда', 'Обувь', 'Аксессуары', 'Причёска', 'Макияж'];
 
   var root = document.getElementById('lookBuilder');
+  var authGate = document.getElementById('lbAuthGate');
   if (!root) return;
 
-  var state = { dataUrl: null };
+  var state = { dataUrl: null, session: null };
 
   function el(tag, className, html) {
     var node = document.createElement(tag);
@@ -136,21 +137,36 @@
 
     fetch('api/compose-look', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + (state.session ? state.session.access_token : '')
+      },
       body: JSON.stringify({ image: state.dataUrl, fit: fit })
     })
       .then(function (res) {
         if (!res.ok) {
           return res.json().catch(function () { return {}; }).then(function (data) {
-            throw new Error(data.error || 'Не получилось собрать образ.');
+            var err = new Error(data.error || 'Не получилось собрать образ.');
+            err.status = res.status;
+            throw err;
           });
         }
         return res.json();
       })
       .then(renderResult)
       .catch(function (err) {
-        status.textContent = (err && err.message) || 'Не получилось собрать образ. Попробуйте ещё раз.';
-        status.className = 'lb-status lb-status--error';
+        if (err && err.status === 402) {
+          status.innerHTML = '';
+          status.className = 'lb-status lb-status--error';
+          status.appendChild(document.createTextNode((err.message || 'Первый образ уже использован.') + ' '));
+          var link = document.createElement('a');
+          link.href = 'cabinet.html';
+          link.textContent = 'Пополнить баланс';
+          status.appendChild(link);
+        } else {
+          status.textContent = (err && err.message) || 'Не получилось собрать образ. Попробуйте ещё раз.';
+          status.className = 'lb-status lb-status--error';
+        }
         goBtn.removeAttribute('disabled');
         goBtn.removeAttribute('aria-disabled');
       });
@@ -201,5 +217,12 @@
     root.appendChild(restartWrap);
   }
 
-  renderUpload();
+  if (authGate && window.stilAuthGate) {
+    window.stilAuthGate.renderGate(authGate, function (session) {
+      state.session = session;
+      renderUpload();
+    });
+  } else {
+    renderUpload();
+  }
 })();
