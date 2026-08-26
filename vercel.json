@@ -1,5 +1,5 @@
 {
   "crons": [
-    { "path": "/api/cron/keep-alive", "schedule": "0 3 * * *" }
+    { "path": "/api/config", "schedule": "0 3 * * *" }
   ]
 }
