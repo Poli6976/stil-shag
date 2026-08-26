@@ -393,3 +393,66 @@ $$;
 
 revoke execute on function public.consume_free_look(uuid) from public;
 grant execute on function public.consume_free_look(uuid) to service_role;
+
+-- ---------------------------------------------------------------------------
+-- 2026-08-26: первый И третий образ бесплатны (раньше — только первый),
+-- по решению пользователя вместо автоматической скидки без кода партнёра
+-- (скидка остаётся эксклюзивной для партнёрской программы). Булев флаг
+-- free_look_used не различает "это первый образ" от "это пятый" — заменён
+-- счётчиком looks_count, который растёт на каждый завершённый образ
+-- (бесплатный, со скидкой или полной ценой), см. lib/lookAccess.js.
+-- ---------------------------------------------------------------------------
+
+alter table public.wallets add column if not exists looks_count integer not null default 0;
+
+-- Разовый перенос данных со старого флага: пользователи, уже потратившие
+-- единственный бесплатный образ, продолжают счёт с looks_count = 1 (не
+-- идеально для тех, кто уже сделал больше платных образов, но таких на
+-- момент миграции единицы — дальнейший счёт продолжится корректно).
+update public.wallets set looks_count = 1 where free_look_used = true and looks_count = 0;
+
+alter table public.wallets drop column if exists free_look_used;
+drop function if exists public.consume_free_look(uuid);
+
+-- Атомарно проверяет и, если да, тут же занимает бесплатный слот (1-й или
+-- 3-й образ). SELECT ... FOR UPDATE не даёт двум параллельным запросам
+-- одного пользователя оба получить один и тот же бесплатный номер образа.
+create or replace function public.consume_free_look_slot(p_user_id uuid)
+returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_count integer;
+  v_is_free boolean;
+begin
+  select looks_count into v_count from public.wallets where user_id = p_user_id for update;
+  v_is_free := (v_count = 0 or v_count = 2);
+  if v_is_free then
+    update public.wallets set looks_count = looks_count + 1, updated_at = now() where user_id = p_user_id;
+  end if;
+  return coalesce(v_is_free, false);
+end;
+$$;
+
+revoke execute on function public.consume_free_look_slot(uuid) from public;
+grant execute on function public.consume_free_look_slot(uuid) to service_role;
+
+-- Продвигает счётчик после ПЛАТНОГО образа (полная цена или скидка по коду
+-- партнёра) — вызывается уже после успешного списания депозита, отдельно от
+-- самого списания: сама оплата уже атомарна на уровне debit_wallet_for_*, а
+-- нумерация образов не влияет на то, сколько денег списать.
+create or replace function public.increment_looks_count(p_user_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  update public.wallets set looks_count = looks_count + 1, updated_at = now() where user_id = p_user_id;
+end;
+$$;
+
+revoke execute on function public.increment_looks_count(uuid) from public;
+grant execute on function public.increment_looks_count(uuid) to service_role;
