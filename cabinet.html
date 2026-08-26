@@ -55,11 +55,15 @@
     <div id="authLoggedOut">
       <p class="section-note">
         Чтобы пополнить баланс и оплачивать услуги с депозита, войдите по email — пароль не нужен,
-        пришлём одноразовую ссылку для входа.
+        пришлём код для входа.
       </p>
       <form class="wardrobe-add" id="loginForm">
         <input type="email" id="loginEmail" placeholder="you@example.com" autocomplete="email" required>
-        <button type="submit" class="btn-3d btn-3d--rect">Прислать ссылку</button>
+        <button type="submit" class="btn-3d btn-3d--rect">Прислать код</button>
+      </form>
+      <form class="wardrobe-add" id="loginCodeForm" style="display:none">
+        <input type="text" id="loginCode" inputmode="numeric" autocomplete="one-time-code" placeholder="Код из письма">
+        <button type="submit" class="btn-3d btn-3d--rect">Подтвердить код</button>
       </form>
       <div id="loginMsg" class="cabinet-status__msg" style="display:none"></div>
     </div>

@@ -91,15 +91,28 @@
       if (walletSection) walletSection.style.display = 'none';
       var loginForm = document.getElementById('loginForm');
       if (loginForm) loginForm.style.display = '';
+      var codeForm = document.getElementById('loginCodeForm');
+      if (codeForm) codeForm.style.display = 'none';
+      var codeInput = document.getElementById('loginCode');
+      if (codeInput) codeInput.value = '';
       showMsg(document.getElementById('loginMsg'), '');
     }
   }
 
+  /* Письмо содержит только код (без кликабельной ссылки) — у некоторых почтовых
+     провайдеров (замечено на list.ru) антифишинг-сканер сам переходит по ссылкам
+     во входящих раньше реального клика пользователя, и одноразовый токен сгорает
+     до того, как человек успевает им воспользоваться. Код, который вводят руками,
+     сканеру взять неоткуда — в письме нет ссылок вообще. */
   function initLoginForm() {
     var form = document.getElementById('loginForm');
     var emailInput = document.getElementById('loginEmail');
     var msg = document.getElementById('loginMsg');
     if (!form || !emailInput) return;
+
+    var codeForm = document.getElementById('loginCodeForm');
+    var codeInput = document.getElementById('loginCode');
+    var pendingEmail = null;
 
     form.addEventListener('submit', function (e) {
       e.preventDefault();
@@ -111,17 +124,42 @@
       if (submitBtn) submitBtn.setAttribute('disabled', '');
       showMsg(msg, '');
 
-      sb.auth.signInWithOtp({ email: email, options: { emailRedirectTo: window.location.href.split('#')[0] } })
+      sb.auth.signInWithOtp({ email: email })
         .then(function (r) {
           if (r.error) throw r.error;
           form.style.display = 'none';
-          showMsg(msg, 'Ссылка для входа отправлена на ' + email + ' — проверьте почту.');
+          pendingEmail = email;
+          if (codeForm) codeForm.style.display = '';
+          showMsg(msg, 'Мы отправили код на ' + email + ' — введите его ниже.');
         })
         .catch(function (err) {
-          showMsg(msg, err.message || 'Не получилось отправить ссылку.', true);
+          showMsg(msg, err.message || 'Не получилось отправить код.', true);
           if (submitBtn) submitBtn.removeAttribute('disabled');
         });
     });
+
+    if (codeForm && codeInput) {
+      codeForm.addEventListener('submit', function (e) {
+        e.preventDefault();
+        if (!sb || !pendingEmail) return;
+        var code = codeInput.value.trim();
+        if (!code) return;
+
+        var codeBtn = codeForm.querySelector('button[type="submit"]');
+        if (codeBtn) codeBtn.setAttribute('disabled', '');
+        showMsg(msg, '');
+
+        sb.auth.verifyOtp({ email: pendingEmail, token: code, type: 'email' })
+          .then(function (r) {
+            if (r.error) throw r.error;
+            /* setLoggedInUI придёт через onAuthStateChange автоматически */
+          })
+          .catch(function (err) {
+            showMsg(msg, err.message || 'Код не подошёл — проверьте и попробуйте снова.', true);
+            if (codeBtn) codeBtn.removeAttribute('disabled');
+          });
+      });
+    }
   }
 
   function initLogout() {
