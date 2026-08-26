@@ -300,19 +300,16 @@ main {
 /* ---------- CTA ----------
    Кнопка закреплена внизу экрана с самого начала (не только после долгого
    скролла) — иначе на длинных страницах до неё никто не долистывает.
-   Раньше это работало только на мобильном; теперь одинаково на всех
-   экранах, включая десктоп (см. how-it-works.html). */
+   Плавающая кнопка без подложки-полосы — держится на собственной тени
+   btn-3d, ничего не перекрывает по всей ширине экрана. Раньше работало
+   только на мобильном; теперь одинаково на всех экранах (десктоп тоже). */
 .page-cta {
   position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  left: 50%;
+  bottom: clamp(16px, 4vw, 28px);
+  transform: translateX(-50%);
   margin: 0;
-  text-align: center;
-  padding: 14px 20px calc(14px + env(safe-area-inset-bottom, 0px));
-  background: var(--bg-deep);
-  border-top: 1px solid var(--glow-silver);
-  box-shadow: 0 -8px 24px rgba(20, 15, 45, 0.14);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
   z-index: 40;
 }
 
@@ -932,15 +929,8 @@ body:has(.page-cta) {
     margin-bottom: 40px;
   }
 
-  /* на телефоне закреплённая кнопка растягивается на всю ширину панели */
-  body:has(.page-cta) {
-    padding-bottom: 84px;
-  }
-
   .page-cta .btn-3d {
-    display: block;
-    width: 100%;
     min-width: 0;
-    padding: 16px 24px;
+    padding: 16px 28px;
   }
 }
