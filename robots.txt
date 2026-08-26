@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://stil-shag.ru/sitemap.xml
+Sitemap: https://www.stil-shag.ru/sitemap.xml

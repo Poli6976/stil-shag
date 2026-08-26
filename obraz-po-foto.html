@@ -5,6 +5,7 @@
 <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Образ по фото — Стиль</title>
+<link rel="canonical" href="https://www.stil-shag.ru/obraz-po-foto.html">
 <meta name="description" content="Загрузите своё фото в одной вещи ансамбля — платье, жакете, брюках — и получите полный образ вокруг неё, собранный ИИ-стилистом.">
 <meta property="og:type" content="website">
 <meta property="og:title" content="Образ по фото — Стиль">
@@ -22,7 +23,7 @@
 <link rel="stylesheet" href="css/tokens.css?v=7">
 <link rel="stylesheet" href="css/base.css?v=2">
 <link rel="stylesheet" href="css/components/button-3d.css?v=3">
-<link rel="stylesheet" href="css/inner.css?v=18">
+<link rel="stylesheet" href="css/inner.css?v=19">
 <link rel="stylesheet" href="css/wizard.css?v=4">
 <link rel="stylesheet" href="css/look-builder.css?v=1">
 </head>
@@ -30,7 +31,8 @@
 
 <header class="page-header">
   <a href="index.html" class="page-header__mark">СТИЛЬ</a>
-  <nav class="page-header__nav">
+  <button type="button" class="page-header__toggle" aria-expanded="false" aria-controls="page-nav">Меню</button>
+  <nav class="page-header__nav" id="page-nav">
     <a href="how-it-works.html">Как это работает</a>
     <a href="online-stylist.html">Онлайн-стилист</a>
     <a href="obraz-po-foto.html">Образ по фото</a>
@@ -91,5 +93,6 @@
 <script src="js/auth-gate.js"></script>
 <script src="js/look-builder.js"></script>
 <script src="js/nav-active.js"></script>
+<script src="js/nav-toggle.js"></script>
 </body>
 </html>

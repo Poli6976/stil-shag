@@ -5,6 +5,7 @@
 <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Цены — Стиль</title>
+<link rel="canonical" href="https://www.stil-shag.ru/prices.html">
 <meta name="description" content="Стоимость услуг сервиса «Стиль — твой шаг по жизни»: подбор образа, консультация виртуального стилиста, повторная примерка со скидкой.">
 <meta property="og:type" content="website">
 <meta property="og:title" content="Цены — Стиль">
@@ -22,13 +23,14 @@
 <link rel="stylesheet" href="css/tokens.css?v=7">
 <link rel="stylesheet" href="css/base.css?v=2">
 <link rel="stylesheet" href="css/components/button-3d.css?v=3">
-<link rel="stylesheet" href="css/inner.css?v=18">
+<link rel="stylesheet" href="css/inner.css?v=19">
 </head>
 <body>
 
 <header class="page-header">
   <a href="index.html" class="page-header__mark">СТИЛЬ</a>
-  <nav class="page-header__nav">
+  <button type="button" class="page-header__toggle" aria-expanded="false" aria-controls="page-nav">Меню</button>
+  <nav class="page-header__nav" id="page-nav">
     <a href="how-it-works.html">Как это работает</a>
     <a href="online-stylist.html">Онлайн-стилист</a>
     <a href="obraz-po-foto.html">Образ по фото</a>
@@ -44,8 +46,7 @@
     <span class="page-hero__eyebrow">Цены</span>
     <h1>Сколько стоит<br>собрать <em>образ</em></h1>
     <p class="page-hero__lead">
-      Первый образ — бесплатно для всех, без покупки. Дальше — фиксированные цены за конкретные
-      услуги, оплата с баланса в <a href="cabinet.html">личном кабинете</a>.
+      Первый образ — бесплатно для всех, без покупки. Дальше — фиксированные цены за конкретные услуги.
     </p>
   </section>
 
@@ -70,8 +71,6 @@
         <span class="price-card__amount">2 990 ₽</span>
         <p>Расширенный автоматический разбор: гардероб и подбор нескольких образов под ваш стиль
           жизни, а не одну вещь.</p>
-        <p>Уже сфотографировались в вещи? Попробуйте <a href="obraz-po-foto.html">образ по фото</a> —
-          загрузите своё фото, и ИИ-стилист соберёт и нарисует образ вокруг того, что на вас надето.</p>
       </div>
     </div>
     <p class="note" style="text-align:center; margin-top: 24px;">
@@ -118,5 +117,6 @@
 </footer>
 
 <script src="js/nav-active.js"></script>
+<script src="js/nav-toggle.js"></script>
 </body>
 </html>

@@ -51,6 +51,25 @@ body {
   border-color: var(--glow-gold);
 }
 
+.page-header__toggle {
+  display: none;
+  font-family: var(--font-body);
+  font-size: var(--fs-small);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--text-primary);
+  background: transparent;
+  border: 1px solid var(--glow-silver);
+  border-radius: 999px;
+  padding: 6px 18px;
+  cursor: pointer;
+}
+
+.page-header__toggle[aria-expanded="true"] {
+  color: var(--accent-gold-ink);
+  border-color: var(--glow-gold);
+}
+
 main {
   max-width: 1040px;
   margin: 0 auto;
@@ -850,5 +869,69 @@ main {
     width: 40px;
     height: 40px;
     font-size: 1.1rem;
+  }
+
+  /* шапка: 6 пунктов сворачиваются в выпадающее меню вместо переноса на 2-3 строки */
+  .page-header__toggle {
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .page-header__nav {
+    flex-basis: 100%;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 14px;
+    max-height: 0;
+    margin-top: 0;
+    opacity: 0;
+    overflow: hidden;
+    transition: max-height 0.25s ease, opacity 0.2s ease, margin-top 0.25s ease;
+  }
+
+  .page-header__nav.is-open {
+    max-height: 320px;
+    margin-top: 18px;
+    opacity: 1;
+  }
+
+  /* короче отступы — на телефоне hero/секции не должны занимать по целому экрану каждая */
+  .page-hero {
+    margin-bottom: 40px;
+  }
+
+  .page-section {
+    margin-bottom: 40px;
+  }
+
+  /* единственная CTA-кнопка сайта переходит в закреплённую внизу панель —
+     иначе на длинных страницах до неё никто не долистывает (см. план по prices.html) */
+  body:has(.page-cta) {
+    padding-bottom: 84px;
+  }
+
+  .page-cta {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    margin: 0;
+    padding: 14px 20px calc(14px + env(safe-area-inset-bottom, 0px));
+    background: var(--bg-deep);
+    border-top: 1px solid var(--glow-silver);
+    box-shadow: 0 -8px 24px rgba(20, 15, 45, 0.14);
+    z-index: 40;
+  }
+
+  .page-cta .btn-3d {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    padding: 16px 24px;
+    margin-bottom: 0;
+  }
+
+  .page-cta__note {
+    display: none;
   }
 }

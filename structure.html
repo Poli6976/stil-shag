@@ -5,6 +5,7 @@
 <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Структура сайта — Стиль</title>
+<link rel="canonical" href="https://www.stil-shag.ru/structure.html">
 <meta name="description" content="Карта сайта «Стиль — твой шаг по жизни»: какие разделы уже готовы, какие в разработке.">
 <meta property="og:type" content="website">
 <meta property="og:title" content="Структура сайта — Стиль">
@@ -22,13 +23,14 @@
 <link rel="stylesheet" href="css/tokens.css?v=7">
 <link rel="stylesheet" href="css/base.css?v=2">
 <link rel="stylesheet" href="css/components/button-3d.css?v=3">
-<link rel="stylesheet" href="css/inner.css?v=18">
+<link rel="stylesheet" href="css/inner.css?v=19">
 </head>
 <body>
 
 <header class="page-header">
   <a href="index.html" class="page-header__mark">СТИЛЬ</a>
-  <nav class="page-header__nav">
+  <button type="button" class="page-header__toggle" aria-expanded="false" aria-controls="page-nav">Меню</button>
+  <nav class="page-header__nav" id="page-nav">
     <a href="how-it-works.html">Как это работает</a>
     <a href="online-stylist.html">Онлайн-стилист</a>
     <a href="obraz-po-foto.html">Образ по фото</a>
@@ -239,5 +241,6 @@
 </footer>
 
 <script src="js/nav-active.js"></script>
+<script src="js/nav-toggle.js"></script>
 </body>
 </html>
