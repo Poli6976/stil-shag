@@ -297,21 +297,37 @@ main {
   margin: 14px 0 0;
 }
 
-/* ---------- CTA ---------- */
+/* ---------- CTA ----------
+   Кнопка закреплена внизу экрана с самого начала (не только после долгого
+   скролла) — иначе на длинных страницах до неё никто не долистывает.
+   Раньше это работало только на мобильном; теперь одинаково на всех
+   экранах, включая десктоп (см. how-it-works.html). */
 .page-cta {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  margin: 0;
   text-align: center;
-  margin-top: clamp(32px, 5vw, 48px);
+  padding: 14px 20px calc(14px + env(safe-area-inset-bottom, 0px));
+  background: var(--bg-deep);
+  border-top: 1px solid var(--glow-silver);
+  box-shadow: 0 -8px 24px rgba(20, 15, 45, 0.14);
+  z-index: 40;
 }
 
 .page-cta .btn-3d {
-  margin-bottom: 16px;
+  margin-bottom: 0;
 }
 
+/* пояснения под кнопкой (например «первый образ — бесплатно») остаются
+   в обычном потоке страницы, а не в закреплённой панели — там им тесно */
 .page-cta__note {
-  font-family: var(--font-body);
-  font-weight: 300;
-  font-size: 0.85rem;
-  color: var(--text-faint);
+  display: none;
+}
+
+body:has(.page-cta) {
+  padding-bottom: 110px;
 }
 
 .btn-3d[aria-disabled="true"] {
@@ -916,23 +932,9 @@ main {
     margin-bottom: 40px;
   }
 
-  /* единственная CTA-кнопка сайта переходит в закреплённую внизу панель —
-     иначе на длинных страницах до неё никто не долистывает (см. план по prices.html) */
+  /* на телефоне закреплённая кнопка растягивается на всю ширину панели */
   body:has(.page-cta) {
     padding-bottom: 84px;
-  }
-
-  .page-cta {
-    position: fixed;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    margin: 0;
-    padding: 14px 20px calc(14px + env(safe-area-inset-bottom, 0px));
-    background: var(--bg-deep);
-    border-top: 1px solid var(--glow-silver);
-    box-shadow: 0 -8px 24px rgba(20, 15, 45, 0.14);
-    z-index: 40;
   }
 
   .page-cta .btn-3d {
@@ -940,10 +942,5 @@ main {
     width: 100%;
     min-width: 0;
     padding: 16px 24px;
-    margin-bottom: 0;
-  }
-
-  .page-cta__note {
-    display: none;
   }
 }
