@@ -214,16 +214,6 @@
     });
   }
 
-  function readTopupAmount(msg) {
-    var amountInput = document.getElementById('topupAmount');
-    var rub = amountInput && parseFloat(amountInput.value);
-    if (!rub || rub <= 0) {
-      showMsg(msg, 'Сначала введите сумму пополнения выше.', true);
-      return null;
-    }
-    return Math.round(rub * 100);
-  }
-
   function initSbpButton() {
     var btn = document.getElementById('sbpPayBtn');
     var resultBox = document.getElementById('sbpResult');
@@ -234,10 +224,6 @@
       if (!sb) return;
       showMsg(msg, '');
       resultBox.style.display = 'none';
-
-      var amountKopecks = readTopupAmount(msg);
-      if (!amountKopecks) return;
-
       btn.setAttribute('disabled', '');
 
       sb.auth.getSession()
@@ -247,7 +233,7 @@
           return authedFetch(session, 'api/payments/create', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ amountKopecks: amountKopecks, provider: 'sbp' })
+            body: JSON.stringify({ provider: 'sbp' })
           });
         })
         .then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); })
@@ -255,6 +241,9 @@
           if (!r.ok) throw new Error((r.data && r.data.error) || 'Не получилось создать заявку.');
           resultBox.innerHTML = '';
           resultBox.appendChild(el('div', 'cabinet-status__count', formatRub(r.data.amountKopecks)));
+          if (r.data.discounted) {
+            resultBox.appendChild(el('p', 'cabinet-status__msg', 'Сумма со скидкой по коду партнёра.'));
+          }
           [
             ['Переведите на телефон', r.data.phone],
             ['Банк', r.data.bank],

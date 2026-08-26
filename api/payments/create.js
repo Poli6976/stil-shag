@@ -13,12 +13,22 @@
    сайта. Обе ветки пишут в одну и ту же таблицу payments (provider различает),
    поэтому api/admin.js может завершить платёж той же функцией finalizeTopup,
    что и вебхук Robokassa.
+
+   Сумма для СБП НЕ берётся из тела запроса — сервер сам вычисляет её как
+   ровно одну «Примерку» (полную или со скидкой, если есть непогашенный код
+   партнёра), см. lib/lookAccess.js/hasAvailableDiscount. Иначе покупателю
+   пришлось бы самому гадать, сколько переводить, а неверная сумма усложнила
+   бы ручную сверку платежа владельцем сайта на admin-sbp-orders.html.
+   Свободная сумма пополнения (amountKopecks из тела) остаётся только у
+   Robokassa — это отдельный полноценный депозит, а не разовая оплата.
    ============================================================================ */
 
 const { requireUser } = require('../../lib/auth');
 const { getSupabaseAdmin } = require('../../lib/supabaseAdmin');
 const { createPaymentLink } = require('../../lib/payments/robokassa');
 const { generateOrderCode } = require('../../lib/payments/sbp');
+const { hasAvailableDiscount } = require('../../lib/wallet');
+const PACKAGES = require('../../lib/packages');
 
 const MIN_TOPUP_KOPECKS = 10000;    // 100 ₽ — не пускаем совсем мелкие/тестовые платежи
 const MAX_TOPUP_KOPECKS = 30000000; // 300 000 ₽ — разумный потолок за один платёж
@@ -39,14 +49,6 @@ module.exports = async function handler(req, res) {
     return;
   }
 
-  var amountKopecks = Math.round(Number(req.body && req.body.amountKopecks));
-  if (!Number.isFinite(amountKopecks) || amountKopecks < MIN_TOPUP_KOPECKS || amountKopecks > MAX_TOPUP_KOPECKS) {
-    res.status(400).json({
-      error: 'Сумма пополнения должна быть от ' + (MIN_TOPUP_KOPECKS / 100) + ' до ' + (MAX_TOPUP_KOPECKS / 100) + ' ₽.'
-    });
-    return;
-  }
-
   var provider = (req.body && req.body.provider) === 'sbp' ? 'sbp' : 'robokassa';
 
   if (provider === 'sbp') {
@@ -55,15 +57,17 @@ module.exports = async function handler(req, res) {
       return;
     }
     try {
+      var discounted = await hasAvailableDiscount(user.id);
+      var sbpAmountKopecks = discounted ? PACKAGES.PRIMERKA_DISCOUNT.priceKopecks : PACKAGES.PRIMERKA.priceKopecks;
       var orderCode = generateOrderCode();
       var supabaseSbp = getSupabaseAdmin();
       var sbpInsert = await supabaseSbp.from('payments').insert({
         user_id: user.id,
         provider: 'sbp',
         provider_payment_id: orderCode,
-        amount_kopecks: amountKopecks,
+        amount_kopecks: sbpAmountKopecks,
         status: 'pending',
-        raw_payload: { orderCode: orderCode }
+        raw_payload: { orderCode: orderCode, discounted: discounted }
       });
       if (sbpInsert.error) throw sbpInsert.error;
 
@@ -73,12 +77,21 @@ module.exports = async function handler(req, res) {
         phone: process.env.SBP_PHONE,
         bank: process.env.SBP_BANK,
         recipientName: process.env.SBP_RECIPIENT_NAME,
-        amountKopecks: amountKopecks
+        amountKopecks: sbpAmountKopecks,
+        discounted: discounted
       });
     } catch (err) {
       console.error('payments/create (sbp) error:', err);
       res.status(502).json({ error: 'Не получилось создать заявку на оплату. Попробуйте ещё раз.' });
     }
+    return;
+  }
+
+  var amountKopecks = Math.round(Number(req.body && req.body.amountKopecks));
+  if (!Number.isFinite(amountKopecks) || amountKopecks < MIN_TOPUP_KOPECKS || amountKopecks > MAX_TOPUP_KOPECKS) {
+    res.status(400).json({
+      error: 'Сумма пополнения должна быть от ' + (MIN_TOPUP_KOPECKS / 100) + ' до ' + (MAX_TOPUP_KOPECKS / 100) + ' ₽.'
+    });
     return;
   }
 
