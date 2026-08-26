@@ -76,17 +76,15 @@
     <h2 class="page-section__title">Баланс</h2>
     <div class="cabinet-status">
       <div class="cabinet-status__count" id="walletBalance">—</div>
-      <p class="cabinet-status__msg">Депозит списывается автоматически при оплате консультации виртуального стилиста или «Примерки».</p>
+      <p class="cabinet-status__msg">Депозит списывается автоматически при оплате «Примерки».</p>
     </div>
-    <form class="wardrobe-add" id="topupForm">
-      <input type="number" id="topupAmount" min="100" step="1" placeholder="Сумма пополнения, ₽" autocomplete="off">
-      <button type="submit" class="btn-3d btn-3d--rect">Пополнить картой</button>
-    </form>
+    <div class="wardrobe-add">
+      <button type="button" id="cardPayBtn" class="btn-3d btn-3d--rect">Оплатить картой</button>
+      <button type="button" id="sbpPayBtn" class="btn-3d btn-3d--rect">Оплатить по СБП</button>
+    </div>
     <p class="section-note">
-      Пока приём карт (Robokassa) проходит проверку, можно оплатить одну примерку переводом по СБП —
-      сумма (998 ₽, или 499 ₽ со скидкой по коду партнёра) посчитается автоматически:
-      <button type="button" id="sbpPayBtn" class="cabinet-link-btn">оплатить по СБП</button>.
-      Подтверждение занимает до нескольких часов.
+      Сумма (998 ₽, или 499 ₽ со скидкой по коду партнёра) подставляется автоматически — вводить
+      ничего не нужно. Оплата по СБП подтверждается вручную, обычно в течение нескольких часов.
     </p>
     <div id="sbpResult" class="cabinet-status" style="display:none"></div>
     <div id="topupMsg" class="cabinet-status__msg" style="display:none"></div>

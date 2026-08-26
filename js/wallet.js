@@ -170,25 +170,15 @@
     });
   }
 
-  function initTopupForm() {
-    var form = document.getElementById('topupForm');
-    var amountInput = document.getElementById('topupAmount');
+  function initCardPayButton() {
+    var btn = document.getElementById('cardPayBtn');
     var msg = document.getElementById('topupMsg');
-    if (!form || !amountInput) return;
+    if (!btn) return;
 
-    form.addEventListener('submit', function (e) {
-      e.preventDefault();
+    btn.addEventListener('click', function () {
       if (!sb) return;
-
-      var rub = parseFloat(amountInput.value);
-      if (!rub || rub <= 0) {
-        showMsg(msg, 'Введите сумму пополнения.', true);
-        return;
-      }
-
-      var submitBtn = form.querySelector('button[type="submit"]');
-      if (submitBtn) submitBtn.setAttribute('disabled', '');
       showMsg(msg, '');
+      btn.setAttribute('disabled', '');
 
       sb.auth.getSession()
         .then(function (r) {
@@ -197,7 +187,7 @@
           return authedFetch(session, 'api/payments/create', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ amountKopecks: Math.round(rub * 100) })
+            body: JSON.stringify({ provider: 'robokassa' })
           });
         })
         .then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); })
@@ -209,7 +199,7 @@
           showMsg(msg, err.message, true);
         })
         .then(function () {
-          if (submitBtn) submitBtn.removeAttribute('disabled');
+          btn.removeAttribute('disabled');
         });
     });
   }
@@ -273,7 +263,7 @@
     sb = await initSupabase();
     initLoginForm();
     initLogout();
-    initTopupForm();
+    initCardPayButton();
     initSbpButton();
 
     if (!sb) {

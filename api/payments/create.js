@@ -1,7 +1,18 @@
 /* ============================================================================
-   POST /api/payments/create — начать пополнение депозита.
+   POST /api/payments/create — начать оплату одной «Примерки» (полной или со
+   скидкой по коду партнёра), картой через Robokassa или переводом по СБП.
 
    Требует залогиненного пользователя (Supabase JWT в Authorization: Bearer).
+   Сумма НИКОГДА не берётся из тела запроса — сервер сам вычисляет её как
+   ровно одну «Примерку» (998₽, или 499₽, если есть непогашенный код
+   партнёра — см. hasAvailableDiscount в lib/wallet.js). Раньше клиент вводил
+   сумму пополнения вручную (свободный депозит) — убрано по прямой просьбе
+   пользователя: сумму приходилось гадать что при оплате картой, что при СБП,
+   а неверная сумма особенно мешала владельцу сайта вручную сверять СБП-заявки
+   на admin-sbp-orders.html. Если в будущем понадобится отдельная оплата
+   «Консультации виртуального стилиста» (другая цена) — это отдельный кейс,
+   пока на сайте нет ни одной кнопки, которая её вызывает.
+
    По умолчанию (или body.provider === 'robokassa') создаёт платёжную ссылку
    в Robokassa — окончательное зачисление на баланс происходит только в
    api/payments/webhook.js, после проверки подписи уведомления (см.
@@ -13,14 +24,6 @@
    сайта. Обе ветки пишут в одну и ту же таблицу payments (provider различает),
    поэтому api/admin.js может завершить платёж той же функцией finalizeTopup,
    что и вебхук Robokassa.
-
-   Сумма для СБП НЕ берётся из тела запроса — сервер сам вычисляет её как
-   ровно одну «Примерку» (полную или со скидкой, если есть непогашенный код
-   партнёра), см. lib/lookAccess.js/hasAvailableDiscount. Иначе покупателю
-   пришлось бы самому гадать, сколько переводить, а неверная сумма усложнила
-   бы ручную сверку платежа владельцем сайта на admin-sbp-orders.html.
-   Свободная сумма пополнения (amountKopecks из тела) остаётся только у
-   Robokassa — это отдельный полноценный депозит, а не разовая оплата.
    ============================================================================ */
 
 const { requireUser } = require('../../lib/auth');
@@ -29,9 +32,6 @@ const { createPaymentLink } = require('../../lib/payments/robokassa');
 const { generateOrderCode } = require('../../lib/payments/sbp');
 const { hasAvailableDiscount } = require('../../lib/wallet');
 const PACKAGES = require('../../lib/packages');
-
-const MIN_TOPUP_KOPECKS = 10000;    // 100 ₽ — не пускаем совсем мелкие/тестовые платежи
-const MAX_TOPUP_KOPECKS = 30000000; // 300 000 ₽ — разумный потолок за один платёж
 
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -49,6 +49,9 @@ module.exports = async function handler(req, res) {
     return;
   }
 
+  var discounted = await hasAvailableDiscount(user.id);
+  var amountKopecks = discounted ? PACKAGES.PRIMERKA_DISCOUNT.priceKopecks : PACKAGES.PRIMERKA.priceKopecks;
+
   var provider = (req.body && req.body.provider) === 'sbp' ? 'sbp' : 'robokassa';
 
   if (provider === 'sbp') {
@@ -57,15 +60,13 @@ module.exports = async function handler(req, res) {
       return;
     }
     try {
-      var discounted = await hasAvailableDiscount(user.id);
-      var sbpAmountKopecks = discounted ? PACKAGES.PRIMERKA_DISCOUNT.priceKopecks : PACKAGES.PRIMERKA.priceKopecks;
       var orderCode = generateOrderCode();
       var supabaseSbp = getSupabaseAdmin();
       var sbpInsert = await supabaseSbp.from('payments').insert({
         user_id: user.id,
         provider: 'sbp',
         provider_payment_id: orderCode,
-        amount_kopecks: sbpAmountKopecks,
+        amount_kopecks: amountKopecks,
         status: 'pending',
         raw_payload: { orderCode: orderCode, discounted: discounted }
       });
@@ -77,21 +78,13 @@ module.exports = async function handler(req, res) {
         phone: process.env.SBP_PHONE,
         bank: process.env.SBP_BANK,
         recipientName: process.env.SBP_RECIPIENT_NAME,
-        amountKopecks: sbpAmountKopecks,
+        amountKopecks: amountKopecks,
         discounted: discounted
       });
     } catch (err) {
       console.error('payments/create (sbp) error:', err);
       res.status(502).json({ error: 'Не получилось создать заявку на оплату. Попробуйте ещё раз.' });
     }
-    return;
-  }
-
-  var amountKopecks = Math.round(Number(req.body && req.body.amountKopecks));
-  if (!Number.isFinite(amountKopecks) || amountKopecks < MIN_TOPUP_KOPECKS || amountKopecks > MAX_TOPUP_KOPECKS) {
-    res.status(400).json({
-      error: 'Сумма пополнения должна быть от ' + (MIN_TOPUP_KOPECKS / 100) + ' до ' + (MAX_TOPUP_KOPECKS / 100) + ' ₽.'
-    });
     return;
   }
 
@@ -103,7 +96,7 @@ module.exports = async function handler(req, res) {
   try {
     var payment = await createPaymentLink({
       amountKopecks: amountKopecks,
-      description: 'Пополнение баланса — Стиль',
+      description: discounted ? PACKAGES.PRIMERKA_DISCOUNT.title : PACKAGES.PRIMERKA.title,
       customerEmail: user.email
     });
 
@@ -114,11 +107,11 @@ module.exports = async function handler(req, res) {
       provider_payment_id: payment.orderId,
       amount_kopecks: amountKopecks,
       status: 'pending',
-      raw_payload: { orderId: payment.orderId, link: payment.link }
+      raw_payload: { orderId: payment.orderId, link: payment.link, discounted: discounted }
     });
     if (insertResult.error) throw insertResult.error;
 
-    res.status(200).json({ confirmationUrl: payment.link });
+    res.status(200).json({ confirmationUrl: payment.link, amountKopecks: amountKopecks, discounted: discounted });
   } catch (err) {
     console.error('payments/create error:', err);
     res.status(502).json({ error: 'Не получилось создать платёж. Попробуйте ещё раз.' });
