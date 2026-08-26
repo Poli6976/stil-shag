@@ -1,6 +1,6 @@
 # Как включить проверку кодов «Примерки»
 
-Код готов (`lib/partnerCode.js`, `api/generate-code.js`, `api/redeem-code.js`,
+Код готов (`lib/partnerCode.js`, `api/admin.js` (action=generate-code), `api/redeem-code.js`,
 `admin-generate-code.html`, таблица `discount_credits` в `db/schema.sql`), но
 чтобы он реально заработал, нужно то же самое, что и для разбора фото (см.
 `DEPLOY-photo-analysis.md`) — сайт задеплоен туда, где выполняется серверный

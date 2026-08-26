@@ -214,11 +214,78 @@
     });
   }
 
+  function readTopupAmount(msg) {
+    var amountInput = document.getElementById('topupAmount');
+    var rub = amountInput && parseFloat(amountInput.value);
+    if (!rub || rub <= 0) {
+      showMsg(msg, 'Сначала введите сумму пополнения выше.', true);
+      return null;
+    }
+    return Math.round(rub * 100);
+  }
+
+  function initSbpButton() {
+    var btn = document.getElementById('sbpPayBtn');
+    var resultBox = document.getElementById('sbpResult');
+    var msg = document.getElementById('topupMsg');
+    if (!btn || !resultBox) return;
+
+    btn.addEventListener('click', function () {
+      if (!sb) return;
+      showMsg(msg, '');
+      resultBox.style.display = 'none';
+
+      var amountKopecks = readTopupAmount(msg);
+      if (!amountKopecks) return;
+
+      btn.setAttribute('disabled', '');
+
+      sb.auth.getSession()
+        .then(function (r) {
+          var session = r.data && r.data.session;
+          if (!session) throw new Error('Сессия истекла — войдите заново.');
+          return authedFetch(session, 'api/payments/create', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ amountKopecks: amountKopecks, provider: 'sbp' })
+          });
+        })
+        .then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); })
+        .then(function (r) {
+          if (!r.ok) throw new Error((r.data && r.data.error) || 'Не получилось создать заявку.');
+          resultBox.innerHTML = '';
+          resultBox.appendChild(el('div', 'cabinet-status__count', formatRub(r.data.amountKopecks)));
+          [
+            ['Переведите на телефон', r.data.phone],
+            ['Банк', r.data.bank],
+            ['Получатель', r.data.recipientName],
+            ['Код заказа (укажите в комментарии к переводу)', r.data.orderCode]
+          ].forEach(function (pair) {
+            var p = el('p', 'cabinet-status__msg');
+            var strong = el('strong', null, pair[1]);
+            p.appendChild(document.createTextNode(pair[0] + ': '));
+            p.appendChild(strong);
+            resultBox.appendChild(p);
+          });
+          resultBox.appendChild(el('p', 'cabinet-status__msg',
+            'После перевода подтверждение придёт не сразу — владелец сайта сверяет заявки вручную, обычно в течение нескольких часов.'));
+          resultBox.style.display = 'block';
+        })
+        .catch(function (err) {
+          showMsg(msg, err.message, true);
+        })
+        .then(function () {
+          btn.removeAttribute('disabled');
+        });
+    });
+  }
+
   async function init() {
     sb = await initSupabase();
     initLoginForm();
     initLogout();
     initTopupForm();
+    initSbpButton();
 
     if (!sb) {
       showMsg(document.getElementById('loginMsg'), 'Вход и оплата пока не настроены на сервере.', true);

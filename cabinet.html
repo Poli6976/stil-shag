@@ -80,8 +80,14 @@
     </div>
     <form class="wardrobe-add" id="topupForm">
       <input type="number" id="topupAmount" min="100" step="1" placeholder="Сумма пополнения, ₽" autocomplete="off">
-      <button type="submit" class="btn-3d btn-3d--rect">Пополнить</button>
+      <button type="submit" class="btn-3d btn-3d--rect">Пополнить картой</button>
     </form>
+    <p class="section-note">
+      Пока приём карт (Robokassa) проходит проверку, можно оплатить переводом по СБП —
+      <button type="button" id="sbpPayBtn" class="cabinet-link-btn">оплатить по СБП</button>.
+      Подтверждение занимает до нескольких часов.
+    </p>
+    <div id="sbpResult" class="cabinet-status" style="display:none"></div>
     <div id="topupMsg" class="cabinet-status__msg" style="display:none"></div>
 
     <h3>История операций</h3>

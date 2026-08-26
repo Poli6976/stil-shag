@@ -47,6 +47,7 @@
   </form>
 
   <div class="admin-result" id="genResult"></div>
+  <p style="margin-top:20px"><a href="admin-sbp-orders.html">Заявки на оплату по СБП →</a></p>
 </div>
 
 <script>
@@ -60,10 +61,10 @@
     resultBox.className = 'admin-result';
     resultBox.style.display = 'block';
     resultBox.textContent = 'Генерирую…';
-    fetch('api/generate-code', {
+    fetch('api/admin', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ adminKey: adminKey, ref: ref })
+      body: JSON.stringify({ action: 'generate-code', adminKey: adminKey, ref: ref })
     })
       .then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); })
       .then(function (r) {

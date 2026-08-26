@@ -2,15 +2,23 @@
    POST /api/payments/create — начать пополнение депозита.
 
    Требует залогиненного пользователя (Supabase JWT в Authorization: Bearer).
-   Создаёт платёжную ссылку в Robokassa и сохраняет запись в таблице payments
-   со статусом pending — окончательное зачисление на баланс происходит только
-   в api/payments/webhook.js, и только после проверки подписи уведомления
-   (см. lib/payments/robokassa.js).
+   По умолчанию (или body.provider === 'robokassa') создаёт платёжную ссылку
+   в Robokassa — окончательное зачисление на баланс происходит только в
+   api/payments/webhook.js, после проверки подписи уведомления (см.
+   lib/payments/robokassa.js).
+
+   При body.provider === 'sbp' — временный ручной канал (см. lib/payments/sbp.js
+   и api/admin.js, action=sbp-confirm): вместо ссылки возвращает номер телефона
+   для перевода и короткий код заказа, зачисление подтверждает вручную владелец
+   сайта. Обе ветки пишут в одну и ту же таблицу payments (provider различает),
+   поэтому api/admin.js может завершить платёж той же функцией finalizeTopup,
+   что и вебхук Robokassa.
    ============================================================================ */
 
 const { requireUser } = require('../../lib/auth');
 const { getSupabaseAdmin } = require('../../lib/supabaseAdmin');
 const { createPaymentLink } = require('../../lib/payments/robokassa');
+const { generateOrderCode } = require('../../lib/payments/sbp');
 
 const MIN_TOPUP_KOPECKS = 10000;    // 100 ₽ — не пускаем совсем мелкие/тестовые платежи
 const MAX_TOPUP_KOPECKS = 30000000; // 300 000 ₽ — разумный потолок за один платёж
@@ -22,10 +30,6 @@ module.exports = async function handler(req, res) {
   }
   if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
     res.status(503).json({ error: 'Вход и оплата пока не настроены на сервере.' });
-    return;
-  }
-  if (!process.env.ROBOKASSA_MERCHANT_LOGIN || !process.env.ROBOKASSA_PASSWORD1) {
-    res.status(503).json({ error: 'Оплата пока не настроена на сервере.' });
     return;
   }
 
@@ -40,6 +44,46 @@ module.exports = async function handler(req, res) {
     res.status(400).json({
       error: 'Сумма пополнения должна быть от ' + (MIN_TOPUP_KOPECKS / 100) + ' до ' + (MAX_TOPUP_KOPECKS / 100) + ' ₽.'
     });
+    return;
+  }
+
+  var provider = (req.body && req.body.provider) === 'sbp' ? 'sbp' : 'robokassa';
+
+  if (provider === 'sbp') {
+    if (!process.env.SBP_PHONE || !process.env.SBP_BANK || !process.env.SBP_RECIPIENT_NAME) {
+      res.status(503).json({ error: 'Оплата по СБП пока не настроена на сервере.' });
+      return;
+    }
+    try {
+      var orderCode = generateOrderCode();
+      var supabaseSbp = getSupabaseAdmin();
+      var sbpInsert = await supabaseSbp.from('payments').insert({
+        user_id: user.id,
+        provider: 'sbp',
+        provider_payment_id: orderCode,
+        amount_kopecks: amountKopecks,
+        status: 'pending',
+        raw_payload: { orderCode: orderCode }
+      });
+      if (sbpInsert.error) throw sbpInsert.error;
+
+      res.status(200).json({
+        method: 'sbp',
+        orderCode: orderCode,
+        phone: process.env.SBP_PHONE,
+        bank: process.env.SBP_BANK,
+        recipientName: process.env.SBP_RECIPIENT_NAME,
+        amountKopecks: amountKopecks
+      });
+    } catch (err) {
+      console.error('payments/create (sbp) error:', err);
+      res.status(502).json({ error: 'Не получилось создать заявку на оплату. Попробуйте ещё раз.' });
+    }
+    return;
+  }
+
+  if (!process.env.ROBOKASSA_MERCHANT_LOGIN || !process.env.ROBOKASSA_PASSWORD1) {
+    res.status(503).json({ error: 'Оплата пока не настроена на сервере.' });
     return;
   }
 

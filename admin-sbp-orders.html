@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="ru" data-theme="light">
+<head>
+<meta charset="utf-8">
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Заявки на оплату по СБП — служебная страница</title>
+<meta name="robots" content="noindex, nofollow">
+
+<link rel="stylesheet" href="css/tokens.css?v=7">
+<link rel="stylesheet" href="css/base.css?v=2">
+<link rel="stylesheet" href="css/components/button-3d.css?v=3">
+<link rel="stylesheet" href="css/cabinet.css?v=1">
+<style>
+  body { display: flex; align-items: flex-start; justify-content: center; min-height: 100vh; padding: 24px; }
+  .admin-card { max-width: 640px; width: 100%; padding: 32px; border-radius: 18px; background: rgba(255,255,255,.55); border: 1px solid var(--glow-silver); margin: 24px 0; }
+  .admin-card h1 { font-family: var(--font-display); font-size: 1.5rem; font-weight: 500; margin: 0 0 8px; }
+  .admin-card p { font-family: var(--font-body); color: var(--text-muted); font-size: .92rem; line-height: 1.6; margin: 0 0 20px; }
+  .admin-field { margin-bottom: 14px; }
+  .admin-field label { display: block; font-family: var(--font-body); font-size: .82rem; color: var(--text-muted); margin-bottom: 6px; }
+  .admin-field input { width: 100%; box-sizing: border-box; padding: 12px 16px; border-radius: 12px; border: 1px solid var(--glow-silver); background: rgba(255,255,255,.6); font-family: var(--font-body); font-size: .96rem; color: var(--text-primary); }
+  .admin-msg { margin-top: 14px; font-family: var(--font-body); font-size: .92rem; color: var(--text-muted); }
+  .admin-msg.is-error { color: #b23b3b; }
+  .admin-card .btn-3d { width: 100%; margin-top: 4px; }
+  .sbp-order-list { list-style: none; margin: 18px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+  .sbp-order { padding: 14px 16px; border-radius: 12px; background: rgba(255,255,255,.6); border: 1px solid var(--glow-silver); }
+  .sbp-order__row { display: flex; justify-content: space-between; gap: 12px; font-family: var(--font-body); font-size: .95rem; color: var(--text-primary); }
+  .sbp-order__row + .sbp-order__row { margin-top: 4px; }
+  .sbp-order__label { color: var(--text-muted); }
+  .sbp-order__code { font-weight: 500; letter-spacing: .04em; }
+  .sbp-order .btn-3d { width: 100%; margin-top: 10px; padding: 10px 16px; font-size: .88rem; }
+  .sbp-empty { font-family: var(--font-body); font-style: italic; color: var(--text-faint); }
+</style>
+</head>
+<body>
+
+<div class="admin-card">
+  <h1>Заявки на оплату по СБП</h1>
+  <p>
+    Служебная страница, не для покупателей — не ссылается ниоткуда на сайте. Введите админ-ключ
+    (переменная окружения <code>ADMIN_KEY</code>), сверьте каждую заявку с реальным поступлением
+    в банковском приложении (по сумме и коду заказа в комментарии к переводу) и подтвердите — депозит
+    зачислится клиенту автоматически.
+  </p>
+
+  <div class="admin-field">
+    <label for="adminKey">Админ-ключ</label>
+    <input type="password" id="adminKey" autocomplete="off">
+  </div>
+  <button type="button" id="loadBtn" class="btn-3d btn-3d--rect">Показать заявки</button>
+
+  <div class="admin-msg" id="msg" style="display:none"></div>
+  <ul class="sbp-order-list" id="orderList"></ul>
+  <p style="margin-top:20px"><a href="admin-generate-code.html">Выдача кода «Примерки» →</a></p>
+</div>
+
+<script>
+(function () {
+  var adminKeyInput = document.getElementById('adminKey');
+  var loadBtn = document.getElementById('loadBtn');
+  var msg = document.getElementById('msg');
+  var orderList = document.getElementById('orderList');
+
+  function showMsg(text, isError) {
+    msg.style.display = text ? 'block' : 'none';
+    msg.textContent = text || '';
+    msg.className = 'admin-msg' + (isError ? ' is-error' : '');
+  }
+
+  function formatRub(kopecks) {
+    return (kopecks / 100).toLocaleString('ru-RU', { maximumFractionDigits: 2 }) + ' ₽';
+  }
+
+  function renderOrders(orders) {
+    orderList.innerHTML = '';
+    if (!orders.length) {
+      var empty = document.createElement('li');
+      empty.className = 'sbp-empty';
+      empty.textContent = 'Неподтверждённых заявок нет.';
+      orderList.appendChild(empty);
+      return;
+    }
+
+    orders.forEach(function (order) {
+      var item = document.createElement('li');
+      item.className = 'sbp-order';
+
+      var rows = [
+        ['Код заказа', order.orderCode],
+        ['Сумма', formatRub(order.amountKopecks)],
+        ['Email', order.email || '—'],
+        ['Создана', new Date(order.createdAt).toLocaleString('ru-RU')]
+      ];
+      rows.forEach(function (pair) {
+        var row = document.createElement('div');
+        row.className = 'sbp-order__row';
+        var label = document.createElement('span');
+        label.className = 'sbp-order__label';
+        label.textContent = pair[0];
+        var value = document.createElement('span');
+        value.className = pair[0] === 'Код заказа' ? 'sbp-order__code' : '';
+        value.textContent = pair[1];
+        row.appendChild(label);
+        row.appendChild(value);
+        item.appendChild(row);
+      });
+
+      var confirmBtn = document.createElement('button');
+      confirmBtn.type = 'button';
+      confirmBtn.className = 'btn-3d btn-3d--rect';
+      confirmBtn.textContent = 'Подтвердить оплату';
+      confirmBtn.addEventListener('click', function () {
+        confirmOrder(order, confirmBtn, item);
+      });
+      item.appendChild(confirmBtn);
+
+      orderList.appendChild(item);
+    });
+  }
+
+  function loadOrders() {
+    var adminKey = adminKeyInput.value;
+    if (!adminKey) {
+      showMsg('Введите админ-ключ.', true);
+      return;
+    }
+    showMsg('Загружаю…');
+    loadBtn.setAttribute('disabled', '');
+
+    fetch('api/admin?action=sbp-list', {
+      headers: { 'X-Admin-Key': adminKey }
+    })
+      .then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); })
+      .then(function (r) {
+        if (!r.ok) throw new Error(r.data.error || 'Не получилось загрузить заявки.');
+        showMsg('');
+        renderOrders(r.data.orders);
+      })
+      .catch(function (err) {
+        showMsg(err.message, true);
+        orderList.innerHTML = '';
+      })
+      .then(function () {
+        loadBtn.removeAttribute('disabled');
+      });
+  }
+
+  function confirmOrder(order, button, item) {
+    button.setAttribute('disabled', '');
+    fetch('api/admin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'sbp-confirm',
+        adminKey: adminKeyInput.value,
+        paymentId: order.paymentId,
+        orderCode: order.orderCode
+      })
+    })
+      .then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); })
+      .then(function (r) {
+        if (!r.ok) throw new Error(r.data.error || 'Не получилось подтвердить платёж.');
+        item.remove();
+      })
+      .catch(function (err) {
+        showMsg(err.message, true);
+        button.removeAttribute('disabled');
+      });
+  }
+
+  loadBtn.addEventListener('click', loadOrders);
+})();
+</script>
+
+</body>
+</html>
