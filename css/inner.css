@@ -705,6 +705,33 @@ main {
   font-style: italic;
 }
 
+/* чекбокс явного согласия на обработку фото/физических параметров — обязателен там,
+   где это обещано в legal-privacy.html/faq.html (загрузка фото, поле роста/размера,
+   ввод кода партнёра) */
+.wizard-consent {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 14px 0;
+  font-family: var(--font-body);
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.wizard-consent input[type="checkbox"] {
+  margin-top: 3px;
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent-gold-ink);
+}
+
+.wizard-consent a {
+  color: var(--accent-gold-ink);
+}
+
 .legal-links {
   max-width: 720px;
   margin: clamp(40px, 6vw, 56px) auto 0;

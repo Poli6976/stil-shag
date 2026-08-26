@@ -9,10 +9,9 @@
    ансамбле: топ+брюки и полный образ с аксессуарами стоят одинаково, потому
    что это всегда 1 регенерация.
 
-   Картинку рисует YandexART, а не Kandinsky/FusionBrain (lib/kandinsky.js
-   оставлен в проекте неиспользуемым) — fusionbrain.ai был недоступен на
-   момент подключения (сбой на стороне сервиса), YandexART делает то же самое
-   и тоже оплачивается российской картой.
+   Картинку рисует YandexART, а не Kandinsky/FusionBrain — fusionbrain.ai был
+   недоступен на момент подключения (сбой на стороне сервиса), YandexART
+   делает то же самое и тоже оплачивается российской картой.
 
    Нужны все 3 секрета сразу — без любого из них эндпоинт вернёт понятную 503,
    а не тихо сломается на середине:
@@ -89,6 +88,10 @@ function buildImagePrompt(layers, fit) {
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Только POST' });
+    return;
+  }
+  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    res.status(503).json({ error: 'Вход и оплата пока не настроены на сервере.' });
     return;
   }
 

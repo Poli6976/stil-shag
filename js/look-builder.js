@@ -71,6 +71,16 @@
 
     var status = el('p', 'lb-status', 'На фото должны быть вы — в вещи, вокруг которой хотим собрать образ. Лицо можно не показывать крупным планом, но силуэт и вещь должны быть видны целиком.');
 
+    var consentWrap = el('label', 'wizard-consent');
+    var consentCheckbox = document.createElement('input');
+    consentCheckbox.type = 'checkbox';
+    consentWrap.appendChild(consentCheckbox);
+    consentWrap.appendChild(el('span', null,
+      'Согласен(на) на обработку фото (включая внешность) и параметров тела сервисами распознавания ' +
+      'изображений GigaChat и генерации YandexART — для сборки образа. Фото не хранится после ответа. ' +
+      'Подробнее — <a href="legal-privacy.html" target="_blank" rel="noopener">Политика конфиденциальности</a>.'
+    ));
+
     var fitField = el('div', 'wizard-field');
     var fitLabel = el('label', null, 'Рост и размер — необязательно, но поможет с посадкой и длиной вещей');
     fitLabel.setAttribute('for', 'lbFit');
@@ -85,6 +95,17 @@
     goBtn.href = '#';
     goBtn.setAttribute('disabled', '');
     goBtn.setAttribute('aria-disabled', 'true');
+
+    function updateGoBtn() {
+      if (state.dataUrl && consentCheckbox.checked) {
+        goBtn.removeAttribute('disabled');
+        goBtn.removeAttribute('aria-disabled');
+      } else {
+        goBtn.setAttribute('disabled', '');
+        goBtn.setAttribute('aria-disabled', 'true');
+      }
+    }
+    consentCheckbox.addEventListener('change', updateGoBtn);
 
     btn.addEventListener('click', function () { input.click(); });
 
@@ -104,8 +125,7 @@
         preview.style.display = 'block';
         status.textContent = 'Фото готово — можно собирать образ.';
         status.className = 'lb-status lb-status--ok';
-        goBtn.removeAttribute('disabled');
-        goBtn.removeAttribute('aria-disabled');
+        updateGoBtn();
       }).catch(function (err) {
         status.textContent = (err && err.message) || 'Не получилось обработать фото.';
         status.className = 'lb-status lb-status--error';
@@ -116,13 +136,14 @@
     box.appendChild(btn);
     box.appendChild(input);
     box.appendChild(status);
+    box.appendChild(consentWrap);
     root.appendChild(box);
     root.appendChild(fitField);
 
     var actions = el('div', 'lb-actions');
     goBtn.addEventListener('click', function (e) {
       e.preventDefault();
-      if (goBtn.hasAttribute('disabled') || !state.dataUrl) return;
+      if (goBtn.hasAttribute('disabled') || !state.dataUrl || !consentCheckbox.checked) return;
       submitLook(status, goBtn, fitInput.value);
     });
     actions.appendChild(goBtn);

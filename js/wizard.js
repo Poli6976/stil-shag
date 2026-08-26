@@ -55,6 +55,7 @@
       id: 'fit',
       type: 'text',
       optional: true,
+      sensitive: true,
       teenSkip: true,
       eyebrow: 'Вопрос 5 · можно пропустить',
       question: 'Рост и размер — если готовы поделиться',
@@ -452,9 +453,24 @@
       var photoField = el('div', 'wizard-field');
       photoField.appendChild(el('label', null, 'Фото вещи (необязательно)'));
 
+      var photoConsentWrap = el('label', 'wizard-consent');
+      var photoConsentCheckbox = document.createElement('input');
+      photoConsentCheckbox.type = 'checkbox';
+      photoConsentWrap.appendChild(photoConsentCheckbox);
+      photoConsentWrap.appendChild(el('span', null,
+        'Согласен(на) на обработку фото вещи сервисом распознавания изображений GigaChat — фото ' +
+        'уходит только туда и не хранится на сайте после ответа. Подробнее — ' +
+        '<a href="legal-privacy.html" target="_blank" rel="noopener">Политика конфиденциальности</a>.'
+      ));
+      photoField.appendChild(photoConsentWrap);
+
       var photoRow = el('div', 'wizard-photo-row');
       var photoBtn = el('button', 'wizard-photo-btn', 'Загрузить фото');
       photoBtn.type = 'button';
+      photoBtn.disabled = true;
+      photoConsentCheckbox.addEventListener('change', function () {
+        photoBtn.disabled = !photoConsentCheckbox.checked;
+      });
       var photoInput = document.createElement('input');
       photoInput.type = 'file';
       photoInput.accept = 'image/*';
@@ -533,7 +549,7 @@
             photoStatus.textContent = (err && err.message) || 'Не получилось разобрать фото — опишите вещь текстом.';
             photoStatus.className = 'wizard-photo-status wizard-photo-status--error';
           })
-          .then(function () { photoBtn.disabled = false; });
+          .then(function () { photoBtn.disabled = !photoConsentCheckbox.checked; });
       });
 
       photoField.appendChild(photoRow);
@@ -583,11 +599,40 @@
       var input = el('textarea', 'wizard-textarea');
       input.placeholder = step.placeholder || '';
       input.value = answers[step.id] || '';
-      input.addEventListener('input', function () { answers[step.id] = input.value; });
       field.appendChild(input);
       root.appendChild(field);
 
-      canAdvance = true;
+      var fitConsentCheckbox = null;
+      if (step.sensitive) {
+        var fitConsentWrap = el('label', 'wizard-consent');
+        fitConsentCheckbox = document.createElement('input');
+        fitConsentCheckbox.type = 'checkbox';
+        fitConsentCheckbox.checked = !!answers[step.id + 'Consent'];
+        fitConsentWrap.appendChild(fitConsentCheckbox);
+        fitConsentWrap.appendChild(el('span', null,
+          'Согласен(на) на обработку этих данных о фигуре для подбора образа — см. ' +
+          '<a href="legal-privacy.html" target="_blank" rel="noopener">Политику конфиденциальности</a>.'
+        ));
+        root.appendChild(fitConsentWrap);
+        fitConsentCheckbox.addEventListener('change', function () {
+          answers[step.id + 'Consent'] = fitConsentCheckbox.checked;
+          recalcTextAdvance();
+        });
+      }
+
+      function recalcTextAdvance() {
+        var hasValue = !!(answers[step.id] && answers[step.id].trim());
+        var ok = !(step.sensitive && hasValue) || (fitConsentCheckbox && fitConsentCheckbox.checked);
+        setNextEnabled(ok);
+      }
+
+      input.addEventListener('input', function () {
+        answers[step.id] = input.value;
+        recalcTextAdvance();
+      });
+
+      var fitHasValue = !!(answers[step.id] && answers[step.id].trim());
+      canAdvance = !(step.sensitive && fitHasValue) || (fitConsentCheckbox && fitConsentCheckbox.checked);
     }
 
     var actions = el('div', 'wizard-actions');

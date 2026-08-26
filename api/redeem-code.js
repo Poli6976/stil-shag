@@ -20,6 +20,10 @@ module.exports = async function handler(req, res) {
     res.status(405).json({ error: 'Только POST' });
     return;
   }
+  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    res.status(503).json({ error: 'Вход и оплата пока не настроены на сервере.' });
+    return;
+  }
   if (!process.env.PARTNER_CODE_SECRET) {
     res.status(503).json({ error: 'Проверка кодов пока не настроена на сервере.' });
     return;

@@ -20,6 +20,10 @@ module.exports = async function handler(req, res) {
     res.status(405).json({ error: 'Только POST' });
     return;
   }
+  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    res.status(503).json({ error: 'Вход и оплата пока не настроены на сервере.' });
+    return;
+  }
   if (!process.env.ROBOKASSA_MERCHANT_LOGIN || !process.env.ROBOKASSA_PASSWORD1) {
     res.status(503).json({ error: 'Оплата пока не настроена на сервере.' });
     return;
