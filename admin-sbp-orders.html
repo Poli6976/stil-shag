@@ -43,11 +43,13 @@
     зачислится клиенту автоматически.
   </p>
 
-  <div class="admin-field">
-    <label for="adminKey">Админ-ключ</label>
-    <input type="password" id="adminKey" autocomplete="off">
-  </div>
-  <button type="button" id="loadBtn" class="btn-3d btn-3d--rect">Показать заявки</button>
+  <form id="loadForm">
+    <div class="admin-field">
+      <label for="adminKey">Админ-ключ</label>
+      <input type="password" id="adminKey" autocomplete="current-password">
+    </div>
+    <button type="submit" id="loadBtn" class="btn-3d btn-3d--rect">Показать заявки</button>
+  </form>
 
   <div class="admin-msg" id="msg" style="display:none"></div>
   <ul class="sbp-order-list" id="orderList"></ul>
@@ -57,6 +59,7 @@
 <script>
 (function () {
   var adminKeyInput = document.getElementById('adminKey');
+  var loadForm = document.getElementById('loadForm');
   var loadBtn = document.getElementById('loadBtn');
   var msg = document.getElementById('msg');
   var orderList = document.getElementById('orderList');
@@ -118,7 +121,8 @@
     });
   }
 
-  function loadOrders() {
+  function loadOrders(e) {
+    if (e) e.preventDefault();
     var adminKey = adminKeyInput.value;
     if (!adminKey) {
       showMsg('Введите админ-ключ.', true);
@@ -168,7 +172,7 @@
       });
   }
 
-  loadBtn.addEventListener('click', loadOrders);
+  loadForm.addEventListener('submit', loadOrders);
 })();
 </script>
 
