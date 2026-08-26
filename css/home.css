@@ -136,21 +136,36 @@ html, body {
 }
 
 /* ---------- заголовок ---------- */
-.reveal-text {
+.hero-heading {
   position: fixed;
   top: 42%;
   left: 50%;
   transform: translate(-50%, -50%);
   z-index: 4;
-  margin: 0;
   width: 100vw;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   text-align: center;
+  gap: 14px;
   pointer-events: none;
   animation: reveal-in 1.4s var(--ease-soft) both;
   animation-delay: 0.2s;
+}
+
+.reveal-text {
+  margin: 0;
+}
+
+.hero-subtitle {
+  margin: 0;
+  font-family: var(--font-body);
+  font-weight: 300;
+  font-size: clamp(0.95rem, 2.2vw, 1.25rem);
+  letter-spacing: 0.01em;
+  color: var(--text-muted);
+  max-width: 34ch;
 }
 
 .reveal-text__inner {
@@ -260,7 +275,7 @@ html, body {
 /* ---------- доступность: уважение reduced motion ---------- */
 @media (prefers-reduced-motion: reduce) {
   .star,
-  .reveal-text,
+  .hero-heading,
   .final-cta {
     animation: none !important;
     opacity: 1;
@@ -291,15 +306,21 @@ html, body {
     height: 52vh;
   }
 
-  .reveal-text {
+  .hero-heading {
     top: 40%;
     width: 100vw;
     padding: 0 8vw;
+    gap: 10px;
   }
 
   .reveal-text__inner {
     white-space: normal;
     font-size: clamp(2.4rem, 15vw, 4.2rem);
+  }
+
+  .hero-subtitle {
+    font-size: 0.9rem;
+    max-width: 28ch;
   }
 
   .reveal-text__inner,
