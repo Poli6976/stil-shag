@@ -345,6 +345,15 @@
   max-width: 520px;
 }
 
+.wizard-result-image {
+  width: 100%;
+  max-width: 420px;
+  display: block;
+  margin: 0 0 clamp(24px, 5vw, 36px);
+  border-radius: 20px;
+  border: 1px solid var(--glow-silver);
+}
+
 .wizard-result__block {
   margin-bottom: clamp(28px, 5vw, 40px);
 }

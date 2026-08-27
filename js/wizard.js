@@ -358,18 +358,33 @@
     }
   }
 
+  function buildTemplateResult() {
+    var isMale = answers.forWhom === 'husband' || answers.forWhom === 'son';
+    var templateSet = isMale ? TEMPLATES_MALE : TEMPLATES;
+    var isTeen = answers.age === 'teen';
+    var tpl = isTeen ? templateSet.teen : (templateSet[answers.occasion] || templateSet.office);
+    var layers = applyItemToLayers(tpl.layers, answers.item);
+    return { tpl: tpl, layers: layers };
+  }
+
   /* Списывает право на образ (бесплатный первый / скидка / полная цена —
-     см. lib/lookAccess.js) и только при успехе показывает шаблон результата.
-     Сама генерация здесь бесплатна для нас (статичные шаблоны), но по
-     бизнес-правилу первый образ бесплатен всем, а дальше платно — поэтому
-     учёт нужен даже без реального ИИ-вызова. */
+     см. lib/lookAccess.js) и только при успехе показывает результат. Слои
+     считаются заранее из статичных шаблонов (бесплатно для нас) и уходят на
+     сервер вместе со списанием — там по ним пробуют нарисовать картинку
+     через YandexART (api/looks/charge.js), необязательный бонус к тексту. */
   function chargeAndRenderResult() {
     root.innerHTML = '';
     root.appendChild(el('p', 'wizard-step__hint', 'Оформляем ваш образ…'));
 
+    var built = buildTemplateResult();
+
     fetch('api/looks/charge', {
       method: 'POST',
-      headers: { 'Authorization': 'Bearer ' + currentSession.access_token }
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + currentSession.access_token
+      },
+      body: JSON.stringify({ layers: built.layers, why: built.tpl.why, fit: answers.fit || '' })
     })
       .then(function (res) {
         if (!res.ok) {
@@ -381,8 +396,8 @@
         }
         return res.json();
       })
-      .then(function () {
-        renderResult();
+      .then(function (data) {
+        renderResult(built, data.image);
       })
       .catch(function (err) {
         root.innerHTML = '';
@@ -674,8 +689,7 @@
     } catch (e) {}
   }
 
-  function renderResult() {
-    var isMale = answers.forWhom === 'husband' || answers.forWhom === 'son';
+  function renderResult(built, image) {
     bumpStyleCount();
 
     progressLabel.textContent = 'Готово';
@@ -683,9 +697,8 @@
 
     root.innerHTML = '';
 
-    var templateSet = isMale ? TEMPLATES_MALE : TEMPLATES;
-    var isTeen = answers.age === 'teen';
-    var tpl = isTeen ? templateSet.teen : (templateSet[answers.occasion] || templateSet.office);
+    var tpl = built.tpl;
+    var layers = built.layers;
     root.appendChild(el('span', 'wizard-result__badge', 'Пример формата, не персональная генерация'));
     root.appendChild(el('h2', null, 'Ваш образ по слоям'));
 
@@ -696,7 +709,16 @@
       'сайту нужен бэкенд с подключением к языковой модели, сейчас это чистая статика.'
     ));
 
-    var layers = applyItemToLayers(tpl.layers, answers.item);
+    if (image) {
+      root.appendChild(el('p', 'wizard-result__note',
+        'Картинка ниже — иллюстрация по описанию выше, нарисованная ИИ с нуля, а не фотография реальной вещи или человека.'
+      ));
+      var img = document.createElement('img');
+      img.className = 'wizard-result-image';
+      img.src = image;
+      img.alt = 'Иллюстрация образа';
+      root.appendChild(img);
+    }
 
     var layersBlock = el('div', 'wizard-result__block');
     layersBlock.appendChild(el('div', 'wizard-result__block-title', '👕 Образ по слоям'));

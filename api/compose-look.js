@@ -30,7 +30,7 @@ const { checkRateLimit } = require('../lib/rateLimit');
 const { requireUser } = require('../lib/auth');
 const { previewLookEntitlement, chargeForLook } = require('../lib/lookAccess');
 const { getAccessToken, uploadFile, chatWithImage } = require('../lib/gigachat');
-const { generateLookImage } = require('../lib/yandexart');
+const { generateLookImage, buildLookImagePrompt } = require('../lib/yandexart');
 const { saveLook } = require('../lib/savedLooks');
 
 const LAYER_KEYS = ['Верх', 'Низ', 'Верхняя одежда', 'Обувь', 'Аксессуары', 'Причёска', 'Макияж'];
@@ -67,55 +67,6 @@ function parseLayers(text) {
     if (LAYER_KEYS.indexOf(key) !== -1) layers[key] = value;
   });
   return { layers: layers, why: why };
-}
-
-/* Голая цифра российского размера ("размер 64") ничего не значит для модели,
-   рисующей картинки — она не обучена на таблицах размеров одежды и без явных
-   слов про телосложение почти всегда рисует типовую худую модель, даже если
-   в промпте есть сам номер размера. Переводим размер в описательную фразу
-   ДО того, как он попадёт в промпт YandexART. Пороги — стандартная
-   российская сетка женской/унисекс одежды (округлённо, т.к. fit — свободный
-   текст пользователя, а не строгий выбор из списка). */
-function sizeToBodyPhrase(size) {
-  if (size <= 46) return null; // близко к типовой модельной фигуре — уточнять нечего
-  if (size <= 50) return 'плотного телосложения, немного полнее среднего';
-  if (size <= 54) return 'полная фигура';
-  if (size <= 60) return 'крупная фигура, плюс-сайз';
-  return 'очень крупная фигура, большой плюс-сайз';
-}
-
-function extractClothingSize(fit) {
-  if (!fit) return null;
-  var m = /размер\D{0,5}(\d{2})\b/i.exec(fit) || /\b(\d{2})\D{0,5}размер/i.exec(fit);
-  if (m) return parseInt(m[1], 10);
-  var nums = fit.match(/\b\d{2}\b/g); // рост обычно 3 цифры (140-200) — сюда не попадёт
-  if (!nums) return null;
-  for (var i = 0; i < nums.length; i++) {
-    var n = parseInt(nums[i], 10);
-    if (n >= 38 && n <= 72) return n;
-  }
-  return null;
-}
-
-/* fit передаётся в промпт картинки, а не только в текст GigaChat — без этого
-   YandexART рисует типовую худую модель независимо от указанного размера. */
-function buildImagePrompt(layers, fit) {
-  var parts = Object.keys(layers)
-    .filter(function (k) { return k !== 'Причёска' && k !== 'Макияж'; })
-    .map(function (k) { return layers[k]; })
-    .filter(Boolean);
-  var prompt = 'Модный лукбук, один цельный образ на модели в полный рост, fashion-иллюстрация: ' +
-    parts.join(', ') + '.';
-  if (fit) {
-    var bodyPhrase = sizeToBodyPhrase(extractClothingSize(fit));
-    prompt += ' Рост и размер клиентки: «' + fit + '».';
-    if (bodyPhrase) {
-      prompt += ' Телосложение модели на картинке — ' + bodyPhrase +
-        '. Это ВАЖНО: не рисуй типовую худую модельную фигуру, она должна быть именно такой.';
-    }
-  }
-  prompt += ' Без текста и надписей на картинке.';
-  return prompt;
 }
 
 module.exports = async function handler(req, res) {
@@ -195,7 +146,7 @@ module.exports = async function handler(req, res) {
     }
 
     var parsed = parseLayers(raw);
-    var imageBase64 = await generateLookImage(buildImagePrompt(parsed.layers, fit));
+    var imageBase64 = await generateLookImage(buildLookImagePrompt(parsed.layers, fit));
 
     /* Списываем только сейчас, когда генерация реально удалась. Если это
        спишет неудачно (крайне редкая гонка — баланс успели потратить между
