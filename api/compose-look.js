@@ -31,6 +31,7 @@ const { requireUser } = require('../lib/auth');
 const { previewLookEntitlement, chargeForLook } = require('../lib/lookAccess');
 const { getAccessToken, uploadFile, chatWithImage } = require('../lib/gigachat');
 const { generateLookImage } = require('../lib/yandexart');
+const { saveLook } = require('../lib/savedLooks');
 
 const LAYER_KEYS = ['Верх', 'Низ', 'Верхняя одежда', 'Обувь', 'Аксессуары', 'Причёска', 'Макияж'];
 const NO_PERSON_MARKER = 'ОШИБКА';
@@ -176,10 +177,28 @@ module.exports = async function handler(req, res) {
       console.error('compose-look: списание после успешной генерации не удалось:', chargeErr);
     }
 
+    /* Сохраняем в «Мои образы» тоже только сейчас, после удачной генерации —
+       по тем же причинам, что и списание выше. Сбой сохранения не должен
+       превращать уже готовый результат в ошибку для клиентки — она всё
+       равно увидит его на экране, просто он не останется в кабинете. */
+    var savedLookId = null;
+    try {
+      var saved = await saveLook(user.id, {
+        layers: parsed.layers,
+        why: parsed.why,
+        fit: fit,
+        imageBuffer: Buffer.from(imageBase64, 'base64')
+      });
+      savedLookId = saved.id;
+    } catch (saveErr) {
+      console.error('compose-look: не удалось сохранить образ в кабинет:', saveErr);
+    }
+
     res.status(200).json({
       layers: parsed.layers,
       why: parsed.why,
-      image: 'data:image/jpeg;base64,' + imageBase64
+      image: 'data:image/jpeg;base64,' + imageBase64,
+      savedLookId: savedLookId
     });
   } catch (err) {
     console.error('compose-look error:', err);

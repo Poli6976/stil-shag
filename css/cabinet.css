@@ -176,3 +176,89 @@
 .cabinet-status__msg--error {
   color: #b23b3b;
 }
+
+/* ---------- «Мои образы» ---------- */
+.saved-looks-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 20px;
+}
+
+.saved-look-card {
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.45);
+  border: 1px solid var(--glow-silver);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.saved-look-card__image {
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  object-fit: cover;
+  display: block;
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.saved-look-card__body {
+  padding: 14px 16px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+}
+
+.saved-look-card__date {
+  font-family: var(--font-body);
+  font-size: 0.76rem;
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.saved-look-card__layers {
+  font-family: var(--font-body);
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.saved-look-card__delete {
+  align-self: flex-start;
+  margin-top: auto;
+  border: 1px solid var(--glow-silver);
+  background: none;
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-family: var(--font-body);
+  font-size: 0.76rem;
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: #b23b3b;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.saved-look-card__delete:hover {
+  background: #b23b3b;
+  color: #fff;
+}
+
+.saved-look-card__delete[disabled] {
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+@media (max-width: 640px) {
+  .saved-looks-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 420px) {
+  .saved-looks-grid {
+    grid-template-columns: 1fr;
+  }
+}

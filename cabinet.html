@@ -24,7 +24,7 @@
 <link rel="stylesheet" href="css/base.css?v=2">
 <link rel="stylesheet" href="css/components/button-3d.css?v=3">
 <link rel="stylesheet" href="css/inner.css?v=20">
-<link rel="stylesheet" href="css/cabinet.css?v=2">
+<link rel="stylesheet" href="css/cabinet.css?v=3">
 </head>
 <body>
 
@@ -93,6 +93,15 @@
 
     <h3>История операций</h3>
     <ul class="wardrobe-list" id="walletHistory"></ul>
+  </section>
+
+  <section class="page-section" id="savedLooksSection" style="display:none">
+    <h2 class="page-section__title">Мои образы</h2>
+    <p class="section-note">
+      Здесь остаются образы, собранные на странице «Образ по фото» — можно вернуться к ним позже
+      или удалить безвозвратно, если больше не нужны.
+    </p>
+    <div class="saved-looks-grid" id="savedLooksGrid"></div>
   </section>
 
   <section class="page-section">
@@ -171,6 +180,7 @@
 </footer>
 
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+<script src="js/saved-looks.js"></script>
 <script src="js/wallet.js"></script>
 <script src="js/cabinet.js"></script>
 <script src="js/nav-active.js"></script>

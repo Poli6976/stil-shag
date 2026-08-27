@@ -51,20 +51,16 @@
     var historyEl = document.getElementById('walletHistory');
 
     try {
-      var balanceRes = await authedFetch(session, 'api/wallet/balance');
-      var balanceData = await balanceRes.json();
-      if (balanceRes.ok && balanceEl) balanceEl.textContent = formatRub(balanceData.balanceKopecks);
-    } catch (e) {}
-
-    try {
-      var historyRes = await authedFetch(session, 'api/wallet/history');
-      var historyData = await historyRes.json();
-      if (historyRes.ok && historyEl) {
+      var res = await authedFetch(session, 'api/wallet/summary');
+      var data = await res.json();
+      if (!res.ok) return;
+      if (balanceEl) balanceEl.textContent = formatRub(data.balanceKopecks);
+      if (historyEl) {
         historyEl.innerHTML = '';
-        if (!historyData.history.length) {
+        if (!data.history.length) {
           historyEl.appendChild(el('li', 'wardrobe-empty', 'Операций пока нет'));
         }
-        historyData.history.forEach(function (tx) {
+        data.history.forEach(function (tx) {
           var sign = tx.type === 'topup' ? '+ ' : '− ';
           var label = sign + formatRub(tx.amountKopecks) + ' · ' + new Date(tx.createdAt).toLocaleString('ru-RU');
           historyEl.appendChild(el('li', 'wardrobe-item', label));
@@ -85,10 +81,13 @@
       if (walletSection) walletSection.style.display = 'block';
       if (emailEl) emailEl.textContent = session.user.email;
       loadWallet(session);
+      if (window.stilSavedLooks) window.stilSavedLooks.load(session);
     } else {
       if (loggedOut) loggedOut.style.display = 'block';
       if (loggedIn) loggedIn.style.display = 'none';
       if (walletSection) walletSection.style.display = 'none';
+      var savedLooksSection = document.getElementById('savedLooksSection');
+      if (savedLooksSection) savedLooksSection.style.display = 'none';
       var loginForm = document.getElementById('loginForm');
       if (loginForm) loginForm.style.display = '';
       var codeForm = document.getElementById('loginCodeForm');

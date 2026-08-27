@@ -456,3 +456,61 @@ $$;
 
 revoke execute on function public.increment_looks_count(uuid) from public;
 grant execute on function public.increment_looks_count(uuid) to service_role;
+
+-- ---------------------------------------------------------------------------
+-- 2026-08-27: «Мои образы» — сохранение результата «Образа по фото»
+-- (api/compose-look.js) в личном кабинете, с правом клиентки удалить его в
+-- любой момент. Хранится только результат работы стилиста (иллюстрация +
+-- текст по слоям) — НЕ исходное селфи, оно по-прежнему нигде не остаётся
+-- (см. lib/gigachat.js и legal-privacy.html п.2). Запись создаёт/удаляет
+-- только api/compose-look.js и api/looks/saved.js service-role ключом — RLS
+-- ниже не даёт клиенту писать/удалять напрямую, тот же принцип, что у
+-- денежных таблиц выше: сервер сам решает, что разрешено, не веря телу
+-- запроса.
+-- ---------------------------------------------------------------------------
+
+create table if not exists public.saved_looks (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid not null references auth.users(id) on delete cascade,
+  layers      jsonb not null default '{}'::jsonb,
+  why         text,
+  fit         text,
+  image_path  text,
+  created_at  timestamptz not null default now()
+);
+
+create index if not exists saved_looks_user_created_idx
+  on public.saved_looks (user_id, created_at desc);
+
+alter table public.saved_looks enable row level security;
+
+create policy "saved_looks_select_own" on public.saved_looks
+  for select using (auth.uid() = user_id);
+
+grant select on public.saved_looks to authenticated;
+-- INSERT/UPDATE/DELETE намеренно не разрешены ни public, ни authenticated —
+-- только service_role (обходит RLS), т.е. только через серверный код выше.
+-- Прямая запись из браузера невозможна, даже если бы кто-то подставил свой
+-- anon-ключ вместе с чужим JWT.
+
+-- ---------------------------------------------------------------------------
+-- Приватное файловое хранилище для картинок сохранённых образов. public =
+-- false — доступа по прямой постоянной ссылке нет вообще, только через
+-- подписанные ссылки на несколько минут, которые выдаёт api/looks/saved.js
+-- после проверки, что запрос — от владельца образа (см. lib/savedLooks.js).
+-- ---------------------------------------------------------------------------
+
+insert into storage.buckets (id, name, public)
+values ('looks', 'looks', false)
+on conflict (id) do nothing;
+
+-- Защита на случай, если в будущем у Storage появится прямой клиентский
+-- доступ — сейчас все обращения идут только через service_role (обходит эти
+-- политики), но без них случайно выданный anon/authenticated доступ читал
+-- бы или удалял бы чужие файлы. Путь объекта — "{user_id}/{look_id}.jpg",
+-- поэтому первый сегмент пути сверяется с auth.uid().
+create policy "looks_bucket_owner_read" on storage.objects
+  for select using (bucket_id = 'looks' and (storage.foldername(name))[1] = auth.uid()::text);
+
+create policy "looks_bucket_owner_delete" on storage.objects
+  for delete using (bucket_id = 'looks' and (storage.foldername(name))[1] = auth.uid()::text);

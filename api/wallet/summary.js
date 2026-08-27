@@ -1,9 +1,12 @@
 /* ============================================================================
-   GET /api/wallet/balance — текущий баланс залогиненного пользователя.
+   GET /api/wallet/summary — баланс + история операций одним запросом.
+   Раньше были отдельными api/wallet/balance.js и api/wallet/history.js —
+   объединены, чтобы освободить один слот в лимите Vercel Hobby (12
+   serverless-функций на деплой) под новый api/looks/saved.js.
    ============================================================================ */
 
 const { requireUser } = require('../../lib/auth');
-const { getBalance } = require('../../lib/wallet');
+const { getBalance, getHistory } = require('../../lib/wallet');
 
 module.exports = async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -23,9 +26,10 @@ module.exports = async function handler(req, res) {
 
   try {
     var wallet = await getBalance(user.id);
-    res.status(200).json(wallet);
+    var history = await getHistory(user.id);
+    res.status(200).json({ balanceKopecks: wallet.balanceKopecks, currency: wallet.currency, history: history });
   } catch (err) {
-    console.error('wallet/balance error:', err);
-    res.status(500).json({ error: 'Не получилось загрузить баланс.' });
+    console.error('wallet/summary error:', err);
+    res.status(500).json({ error: 'Не получилось загрузить кошелёк.' });
   }
 };
