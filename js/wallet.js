@@ -273,9 +273,14 @@
       return;
     }
 
-    var initial = await sb.auth.getSession();
-    setLoggedInUI(initial.data && initial.data.session);
-
+    /* Раньше здесь ещё был отдельный ручной sb.auth.getSession() +
+       setLoggedInUI() перед подпиской — но onAuthStateChange в supabase-js v2
+       и так сразу стреляет текущей сессией при подписке (событие
+       INITIAL_SESSION), поэтому ручной вызов дублировал его. Из-за этого
+       setLoggedInUI (а с ней stilSavedLooks.load) срабатывала дважды подряд
+       на каждой загрузке кабинета — два параллельных запроса «Моих образов»
+       гонялись друг с другом и оба дорисовывали карточки в одну и ту же
+       сетку, отсюда задвоенные образы в личном кабинете. */
     sb.auth.onAuthStateChange(function (_event, session) {
       setLoggedInUI(session);
     });

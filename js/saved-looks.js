@@ -79,6 +79,12 @@
     grid.appendChild(card);
   }
 
+  /* Растёт при каждом вызове load() — если пока летит старый запрос придёт
+     новый (например, повторное срабатывание onAuthStateChange), ответ
+     устаревшего запроса не должен дорисовывать карточки поверх свежего —
+     раньше оба ответа просто накладывались друг на друга в одну сетку. */
+  var loadToken = 0;
+
   function load(session) {
     var section = document.getElementById('savedLooksSection');
     var grid = document.getElementById('savedLooksGrid');
@@ -86,15 +92,19 @@
     section.style.display = 'block';
     grid.innerHTML = '';
 
+    var myToken = ++loadToken;
+
     authedFetch(session, 'api/looks/saved')
       .then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); })
       .then(function (r) {
+        if (myToken !== loadToken) return;
         if (!r.ok) throw new Error((r.data && r.data.error) || 'Не получилось загрузить образы.');
         var looks = r.data.looks || [];
         if (!looks.length) { renderEmpty(grid); return; }
         looks.forEach(function (look) { renderCard(session, grid, look); });
       })
       .catch(function () {
+        if (myToken !== loadToken) return;
         grid.innerHTML = '';
         grid.appendChild(el('p', 'wardrobe-empty', 'Не получилось загрузить сохранённые образы.'));
       });
