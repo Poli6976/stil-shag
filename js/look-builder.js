@@ -61,6 +61,10 @@
     var btn = el('button', 'btn-3d btn-3d--rect', 'Загрузить фото');
     btn.type = 'button';
 
+    var removeBtn = el('button', 'wizard-back', 'Удалить фото');
+    removeBtn.type = 'button';
+    removeBtn.style.display = 'none';
+
     var input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*';
@@ -69,7 +73,8 @@
     input.style.height = '1px';
     input.style.opacity = '0';
 
-    var status = el('p', 'lb-status', 'На фото должны быть вы — в вещи, вокруг которой хотим собрать образ. Лицо можно не показывать крупным планом, но силуэт и вещь должны быть видны целиком.');
+    var DEFAULT_STATUS = 'На фото должны быть вы — в вещи, вокруг которой хотим собрать образ. Лицо можно не показывать крупным планом, но силуэт и вещь должны быть видны целиком.';
+    var status = el('p', 'lb-status', DEFAULT_STATUS);
 
     var consentWrap = el('label', 'wizard-consent');
     var consentCheckbox = document.createElement('input');
@@ -123,6 +128,7 @@
         state.dataUrl = dataUrl;
         preview.src = dataUrl;
         preview.style.display = 'block';
+        removeBtn.style.display = '';
         status.textContent = 'Фото готово — можно собирать образ.';
         status.className = 'lb-status lb-status--ok';
         updateGoBtn();
@@ -132,8 +138,20 @@
       });
     });
 
+    removeBtn.addEventListener('click', function () {
+      state.dataUrl = null;
+      preview.src = '';
+      preview.style.display = 'none';
+      removeBtn.style.display = 'none';
+      input.value = ''; // без этого повторный выбор того же файла не сработает
+      status.textContent = DEFAULT_STATUS;
+      status.className = 'lb-status';
+      updateGoBtn();
+    });
+
     box.appendChild(preview);
     box.appendChild(btn);
+    box.appendChild(removeBtn);
     box.appendChild(input);
     box.appendChild(status);
     box.appendChild(consentWrap);
