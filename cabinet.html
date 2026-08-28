@@ -97,6 +97,30 @@
     </div>
   </section>
 
+  <!-- Стоит сразу после входа, ДО walletSection/savedLooksSection: те скрыты
+       (display:none) до входа и раскрываются JS уже после логина, добавляя
+       контент асинхронно (аватарка, «Мои образы» с картинками) — если бы
+       этот блок стоял после них, как раньше, якорь cabinet.html#partnerCodeSection
+       скроллил бы сюда ДО того, как они дорисуются, а потом их появление
+       сдвигало бы страницу и уносило поле ввода кода вниз, за пределы экрана
+       (баг, пойманный пользователем: «строка появляется и сразу пропадает»). -->
+  <section class="page-section" id="partnerCodeSection">
+    <h2 class="page-section__title">Код от партнёра</h2>
+    <p class="section-note">
+      Купили вещь у партнёра — продавец сам расскажет о программе и даст вам код. Введите его здесь,
+      и скидка на следующую примерку включится автоматически, без переходов и подтверждений.
+    </p>
+    <form class="wardrobe-add" id="codeForm">
+      <input type="text" id="codeInput" placeholder="Например: STIL-ANNA1-7F3K9QXM" autocomplete="off">
+      <button type="submit" class="btn-3d btn-3d--rect">Активировать</button>
+    </form>
+    <label class="wizard-consent">
+      <input type="checkbox" id="codeConsent" required>
+      <span>Подтверждаю, что ознакомлен(а) с условиями программы «Примерка» (<a href="primerka.html" target="_blank" rel="noopener">как это работает</a>, <a href="legal-offer.html" target="_blank" rel="noopener">оферта</a>) и согласен(на) с ними.</span>
+    </label>
+    <div id="codeMsg"></div>
+  </section>
+
   <section class="page-section" id="walletSection" style="display:none">
     <h2 class="page-section__title">Баланс</h2>
     <div class="cabinet-status">
@@ -132,23 +156,6 @@
   <section class="page-section">
     <h2 class="page-section__title">Статус примерок</h2>
     <div class="cabinet-status" id="cabinetStatus"></div>
-  </section>
-
-  <section class="page-section" id="partnerCodeSection">
-    <h2 class="page-section__title">Код от партнёра</h2>
-    <p class="section-note">
-      Купили вещь у партнёра — продавец сам расскажет о программе и даст вам код. Введите его здесь,
-      и скидка на следующую примерку включится автоматически, без переходов и подтверждений.
-    </p>
-    <form class="wardrobe-add" id="codeForm">
-      <input type="text" id="codeInput" placeholder="Например: STIL-ANNA1-7F3K9QXM" autocomplete="off">
-      <button type="submit" class="btn-3d btn-3d--rect">Активировать</button>
-    </form>
-    <label class="wizard-consent">
-      <input type="checkbox" id="codeConsent" required>
-      <span>Подтверждаю, что ознакомлен(а) с условиями программы «Примерка» (<a href="primerka.html" target="_blank" rel="noopener">как это работает</a>, <a href="legal-offer.html" target="_blank" rel="noopener">оферта</a>) и согласен(на) с ними.</span>
-    </label>
-    <div id="codeMsg"></div>
   </section>
 
   <section class="page-section">
