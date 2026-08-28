@@ -457,18 +457,6 @@ body:has(.page-cta) {
   text-decoration: underline;
 }
 
-.site-footer__credit {
-  font-family: var(--font-body);
-  font-size: 0.78rem;
-  color: var(--text-faint);
-  margin: 0 0 12px;
-}
-
-.site-footer__credit a {
-  color: inherit;
-  text-decoration: underline;
-}
-
 @media (max-width: 640px) {
   .site-footer__grid {
     grid-template-columns: 1fr 1fr;
