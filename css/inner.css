@@ -735,6 +735,23 @@ body:has(.page-cta) {
   margin-top: 18px;
 }
 
+/* Подсказка про код партнёра — не второстепенная приписка, а функциональная
+   ссылка на скидку 50%: должна быть заметна, а не теряться, как обычный
+   .note/.page-cta__note (пользователь не увидел мелкий блёклый текст и
+   прошёл мимо ввода кода). Крупнее и тёмным текстом, не приглушённым. */
+.discount-hint {
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 1.05rem;
+  line-height: 1.6;
+  color: var(--text-primary);
+  margin-top: 18px;
+}
+
+.discount-hint a {
+  color: var(--accent-gold-ink);
+}
+
 /* ---------- юридические страницы: баннер-черновик + типографика документа ---------- */
 .legal-note {
   max-width: 720px;

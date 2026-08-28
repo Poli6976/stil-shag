@@ -86,12 +86,13 @@
     var input = document.getElementById('codeInput');
     var submitBtn = form ? form.querySelector('button[type="submit"]') : null;
     var msgBox = document.getElementById('codeMsg');
+    var consentLabel = document.querySelector('#partnerCodeSection .wizard-consent');
     if (!form || !input) return;
 
-    function showCodeMsg(text, isError) {
+    function showCodeMsg(text, variant) {
       if (!msgBox) return;
       msgBox.textContent = text || '';
-      msgBox.className = 'cabinet-status__msg' + (isError ? ' cabinet-status__msg--error' : '');
+      msgBox.className = 'cabinet-status__msg' + (variant ? ' cabinet-status__msg--' + variant : '');
     }
 
     form.addEventListener('submit', function (e) {
@@ -120,12 +121,17 @@
           if (!r.data.valid) {
             throw new Error(r.data.error || 'Такой код не распознан — проверьте, что он введён без опечаток.');
           }
-          input.value = '';
-          showCodeMsg('Код принят — скидка 50% доступна на следующую примерку.');
+          /* Прячем саму форму (и чекбокс согласия) — клиентка вводит код один
+             раз, дальше поле ввода уже не нужно, а его исчезновение вместе с
+             явным «Код принят» — самый однозначный сигнал, что всё сработало,
+             без необходимости приглядываться к мелкому статусу. */
+          form.style.display = 'none';
+          if (consentLabel) consentLabel.style.display = 'none';
+          showCodeMsg('✓ Код принят — скидка 50% доступна на следующую примерку.', 'success');
           renderStatus();
         })
         .catch(function (err) {
-          showCodeMsg(err.message, true);
+          showCodeMsg(err.message, 'error');
         })
         .then(function () {
           if (submitBtn) submitBtn.removeAttribute('disabled');
