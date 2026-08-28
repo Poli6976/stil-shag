@@ -628,3 +628,35 @@ create policy "avatars_owner_all" on storage.objects
   for all
   using (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text)
   with check (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text);
+
+-- ---------------------------------------------------------------------------
+-- 2026-08-28: каждый 3-й образ бесплатен бессрочно (раньше — разово 1-й и
+-- 3-й, дальше всегда платно). Решение пользователя: постоянный цикл
+-- «1 бесплатно — 2 платно» — из соображений поведенческой психологии
+-- (goal-gradient effect: клиентка, купившая первый из двух платных, охотнее
+-- и быстрее берёт второй, чтобы получить следующий бесплатный) при том, что
+-- маржа на платном образе (998 ₽ / 499 ₽ по коду партнёра против
+-- себестоимости в единицы-десятки рублей) с запасом покрывает щедрость.
+-- В текстах сайта подаётся как подарок постоянным клиенткам, не как купон.
+-- Меняет только условие свободного слота — во всём остальном функция та же,
+-- что и в исходном определении выше (SELECT ... FOR UPDATE, атомарность).
+-- ---------------------------------------------------------------------------
+
+create or replace function public.consume_free_look_slot(p_user_id uuid)
+returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_count integer;
+  v_is_free boolean;
+begin
+  select looks_count into v_count from public.wallets where user_id = p_user_id for update;
+  v_is_free := (v_count % 3 = 0);
+  if v_is_free then
+    update public.wallets set looks_count = looks_count + 1, updated_at = now() where user_id = p_user_id;
+  end if;
+  return coalesce(v_is_free, false);
+end;
+$$;
