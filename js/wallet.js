@@ -69,6 +69,129 @@
     } catch (e) {}
   }
 
+  /* ---------- аватарка клиентки ---------- */
+  var AVATAR_BUCKET = 'avatars';
+
+  function avatarPublicUrl(path) {
+    if (!sb || !path) return null;
+    var r = sb.storage.from(AVATAR_BUCKET).getPublicUrl(path);
+    return (r.data && r.data.publicUrl) || null;
+  }
+
+  function renderAvatar(path) {
+    var img = document.getElementById('avatarImg');
+    var placeholder = document.getElementById('avatarPlaceholder');
+    var removeBtn = document.getElementById('avatarRemoveBtn');
+    if (!img || !placeholder) return;
+    var url = avatarPublicUrl(path);
+    if (url) {
+      img.src = url + '?t=' + Date.now(); // без этого браузер после замены фото первое время показывал бы старую картинку из кэша по тому же пути
+      img.style.display = '';
+      placeholder.style.display = 'none';
+      if (removeBtn) removeBtn.style.display = '';
+    } else {
+      img.removeAttribute('src');
+      img.style.display = 'none';
+      placeholder.style.display = '';
+      if (removeBtn) removeBtn.style.display = 'none';
+    }
+  }
+
+  function loadAvatar(session) {
+    if (!sb) return;
+    sb.from('wallets').select('avatar_path').eq('user_id', session.user.id).single()
+      .then(function (r) { renderAvatar(r.data && r.data.avatar_path); })
+      .catch(function () {});
+  }
+
+  /* Ужимает фото до квадрата 320×320 (canvas, cover-обрезка по центру) —
+     оригинал с телефона легко весит несколько МБ, а тут нужна просто
+     маленькая круглая аватарка, не полноразмерное фото. */
+  function resizeAvatarFile(file) {
+    return new Promise(function (resolve, reject) {
+      var reader = new FileReader();
+      reader.onload = function (e) {
+        var img = new Image();
+        img.onload = function () {
+          var size = 320;
+          var canvas = document.createElement('canvas');
+          canvas.width = size;
+          canvas.height = size;
+          var ctx = canvas.getContext('2d');
+          var scale = Math.max(size / img.width, size / img.height);
+          var w = img.width * scale;
+          var h = img.height * scale;
+          ctx.drawImage(img, (size - w) / 2, (size - h) / 2, w, h);
+          canvas.toBlob(function (blob) {
+            if (!blob) { reject(new Error('Не получилось обработать фото.')); return; }
+            resolve(blob);
+          }, 'image/jpeg', 0.85);
+        };
+        img.onerror = function () { reject(new Error('Не получилось прочитать фото.')); };
+        img.src = e.target.result;
+      };
+      reader.onerror = function () { reject(new Error('Не получилось прочитать файл.')); };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function initAvatarUpload() {
+    var input = document.getElementById('avatarInput');
+    var removeBtn = document.getElementById('avatarRemoveBtn');
+    var msg = document.getElementById('avatarMsg');
+    if (!input) return;
+
+    input.addEventListener('change', function () {
+      var file = input.files && input.files[0];
+      input.value = '';
+      if (!file || !sb) return;
+      if (!/^image\//.test(file.type)) {
+        showMsg(msg, 'Нужен файл изображения.', true);
+        return;
+      }
+      showMsg(msg, 'Загружаю…');
+
+      sb.auth.getSession().then(function (r) {
+        var session = r.data && r.data.session;
+        if (!session) throw new Error('Сессия истекла — войдите заново.');
+        return resizeAvatarFile(file).then(function (blob) {
+          var path = session.user.id + '/avatar.jpg';
+          return sb.storage.from(AVATAR_BUCKET).upload(path, blob, { upsert: true, contentType: 'image/jpeg' })
+            .then(function (uploadResult) {
+              if (uploadResult.error) throw uploadResult.error;
+              return sb.rpc('set_avatar_path', { p_avatar_path: path });
+            })
+            .then(function (rpcResult) {
+              if (rpcResult.error) throw rpcResult.error;
+              renderAvatar(path);
+              showMsg(msg, '');
+            });
+        });
+      }).catch(function (err) {
+        showMsg(msg, err.message || 'Не получилось загрузить фото.', true);
+      });
+    });
+
+    if (removeBtn) {
+      removeBtn.addEventListener('click', function () {
+        if (!sb) return;
+        showMsg(msg, '');
+        sb.auth.getSession().then(function (r) {
+          var session = r.data && r.data.session;
+          if (!session) throw new Error('Сессия истекла — войдите заново.');
+          var path = session.user.id + '/avatar.jpg';
+          return sb.storage.from(AVATAR_BUCKET).remove([path]).then(function () {
+            return sb.rpc('set_avatar_path', { p_avatar_path: null });
+          });
+        }).then(function () {
+          renderAvatar(null);
+        }).catch(function (err) {
+          showMsg(msg, err.message || 'Не получилось удалить фото.', true);
+        });
+      });
+    }
+  }
+
   function setLoggedInUI(session) {
     var loggedOut = document.getElementById('authLoggedOut');
     var loggedIn = document.getElementById('authLoggedIn');
@@ -81,11 +204,13 @@
       if (walletSection) walletSection.style.display = 'block';
       if (emailEl) emailEl.textContent = session.user.email;
       loadWallet(session);
+      loadAvatar(session);
       if (window.stilSavedLooks) window.stilSavedLooks.load(session);
     } else {
       if (loggedOut) loggedOut.style.display = 'block';
       if (loggedIn) loggedIn.style.display = 'none';
       if (walletSection) walletSection.style.display = 'none';
+      renderAvatar(null);
       var savedLooksSection = document.getElementById('savedLooksSection');
       if (savedLooksSection) savedLooksSection.style.display = 'none';
       var loginForm = document.getElementById('loginForm');
@@ -264,6 +389,7 @@
     initLogout();
     initCardPayButton();
     initSbpButton();
+    initAvatarUpload();
 
     if (!sb) {
       showMsg(document.getElementById('loginMsg'), 'Вход и оплата пока не настроены на сервере.', true);

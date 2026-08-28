@@ -161,6 +161,48 @@
   }
 }
 
+/* ---------- аватарка клиентки ---------- */
+.cabinet-avatar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.cabinet-avatar__img,
+.cabinet-avatar__placeholder {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.cabinet-avatar__img {
+  object-fit: cover;
+  border: 1px solid var(--glow-silver);
+}
+
+.cabinet-avatar__placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.5);
+  border: 1px solid var(--glow-silver);
+  color: var(--text-faint);
+}
+
+.cabinet-avatar__placeholder svg {
+  width: 30px;
+  height: 30px;
+}
+
+.cabinet-avatar__actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
 /* ---------- вход и баланс (Supabase Auth) ---------- */
 .cabinet-link-btn {
   border: none;

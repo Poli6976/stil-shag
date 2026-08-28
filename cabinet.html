@@ -23,22 +23,30 @@
 <link rel="stylesheet" href="css/tokens.css?v=7">
 <link rel="stylesheet" href="css/base.css?v=2">
 <link rel="stylesheet" href="css/components/button-3d.css?v=3">
-<link rel="stylesheet" href="css/inner.css?v=20">
-<link rel="stylesheet" href="css/cabinet.css?v=3">
+<link rel="stylesheet" href="css/inner.css?v=21">
+<link rel="stylesheet" href="css/cabinet.css?v=4">
 </head>
 <body>
 
 <header class="page-header">
   <a href="index.html" class="page-header__mark">СТИЛЬ</a>
-  <button type="button" class="page-header__toggle" aria-expanded="false" aria-controls="page-nav">Меню</button>
-  <nav class="page-header__nav" id="page-nav">
-    <a href="how-it-works.html">Как это работает</a>
-    <a href="online-stylist.html">Онлайн-стилист</a>
-    <a href="obraz-po-foto.html">Образ по фото</a>
-    <a href="primerka.html">Примерка</a>
-    <a href="prices.html">Цены</a>
-    <a href="faq.html">FAQ</a>
-  </nav>
+  <div class="page-header__right">
+    <button type="button" class="page-header__toggle" aria-expanded="false" aria-controls="page-nav">Меню</button>
+    <nav class="page-header__nav" id="page-nav">
+      <a href="how-it-works.html">Как это работает</a>
+      <a href="online-stylist.html">Онлайн-стилист</a>
+      <a href="obraz-po-foto.html">Образ по фото</a>
+      <a href="primerka.html">Примерка</a>
+      <a href="prices.html">Цены</a>
+      <a href="faq.html">FAQ</a>
+    </nav>
+    <a href="cabinet.html" class="page-header__account" aria-label="Личный кабинет">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+        <circle cx="12" cy="8" r="3.4"></circle>
+        <path d="M4.5 20c1.4-4 4-6 7.5-6s6.1 2 7.5 6"></path>
+      </svg>
+    </a>
+  </div>
 </header>
 
 <main>
@@ -70,6 +78,21 @@
       <div id="loginMsg" class="cabinet-status__msg" style="display:none"></div>
     </div>
     <div id="authLoggedIn" style="display:none">
+      <div class="cabinet-avatar">
+        <img id="avatarImg" class="cabinet-avatar__img" alt="Ваша аватарка" style="display:none">
+        <div id="avatarPlaceholder" class="cabinet-avatar__placeholder" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+            <circle cx="12" cy="8" r="3.4"></circle>
+            <path d="M4.5 20c1.4-4 4-6 7.5-6s6.1 2 7.5 6"></path>
+          </svg>
+        </div>
+        <div class="cabinet-avatar__actions">
+          <label class="cabinet-link-btn" for="avatarInput">Изменить фото</label>
+          <input type="file" id="avatarInput" accept="image/*" style="display:none">
+          <button type="button" id="avatarRemoveBtn" class="cabinet-link-btn" style="display:none">Удалить фото</button>
+        </div>
+      </div>
+      <div id="avatarMsg" class="cabinet-status__msg" style="display:none"></div>
       <p class="section-note">Вы вошли как <strong id="authEmail"></strong>. <button type="button" id="logoutBtn" class="cabinet-link-btn">Выйти</button></p>
     </div>
   </section>

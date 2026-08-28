@@ -583,3 +583,48 @@ left join public.partner_codes pc on pc.partner_id = p.id
 left join public.discount_credits dc on dc.code = pc.code
 left join public.orders o on o.id = dc.order_id
 group by p.id, p.name, p.slug, p.contact, p.status, p.notes, p.created_at;
+
+-- ---------------------------------------------------------------------------
+-- 2026-08-28: Аватарка клиентки в личном кабинете.
+--
+-- avatar_path хранится в уже существующей wallets (тот же паттерн, что и
+-- looks_count выше — это давно не только "кошелёк", а общая запись состояния
+-- пользователя). Путь к файлу пишется НЕ напрямую UPDATE из браузера (RLS на
+-- wallets разрешает только SELECT своей строки, см. выше), а через отдельную
+-- SECURITY DEFINER функцию set_avatar_path — она сама берёт auth.uid() из
+-- проверенного JWT, поэтому клиент не может подставить чужой user_id. Это
+-- единственная функция в файле, выданная НЕ service_role, а authenticated —
+-- сознательно: это самообслуживание клиентки собственным профилем, а не
+-- админ-действие с деньгами, разбирать через отдельный serverless-эндпоинт
+-- незачем (на Vercel Hobby и так занят весь лимит в 12 функций).
+-- ---------------------------------------------------------------------------
+
+alter table public.wallets add column if not exists avatar_path text;
+
+create or replace function public.set_avatar_path(p_avatar_path text)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  update public.wallets set avatar_path = p_avatar_path, updated_at = now() where user_id = auth.uid();
+end;
+$$;
+
+revoke execute on function public.set_avatar_path(text) from public;
+grant execute on function public.set_avatar_path(text) to authenticated;
+
+-- Публичный бакет (в отличие от приватного 'looks' выше) — аватарка не несёт
+-- той же чувствительности, что результат ИИ-примерки, и публичный бакет даёт
+-- простую постоянную ссылку без подписанных URL и без нового serverless-
+-- эндпоинта на их выдачу. Запись (загрузка/замена/удаление) всё равно только
+-- в свою папку — RLS ниже сверяет первый сегмент пути с auth.uid().
+insert into storage.buckets (id, name, public)
+values ('avatars', 'avatars', true)
+on conflict (id) do nothing;
+
+create policy "avatars_owner_all" on storage.objects
+  for all
+  using (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text)
+  with check (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text);

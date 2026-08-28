@@ -135,6 +135,35 @@ html, body {
   color: var(--text-muted);
 }
 
+/* Личный кабинет — отдельный элемент, не внутри .site-header (у той —
+   pointer-events:none, она чисто декоративная центрированная марка). */
+.home-account {
+  position: fixed;
+  top: 28px;
+  right: clamp(20px, 5vw, 48px);
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid var(--glow-silver);
+  color: var(--text-muted);
+  text-decoration: none;
+  transition: color 0.2s ease, border-color 0.2s ease;
+}
+
+.home-account:hover {
+  color: var(--accent-gold);
+  border-color: var(--glow-gold);
+}
+
+.home-account svg {
+  width: 18px;
+  height: 18px;
+}
+
 /* ---------- заголовок ---------- */
 .hero-heading {
   position: fixed;
@@ -286,6 +315,13 @@ html, body {
 @media (max-width: 767px) {
   .site-header {
     top: 18px;
+  }
+
+  .home-account {
+    top: 18px;
+    right: 16px;
+    width: 30px;
+    height: 30px;
   }
 
   .fig-silhouette--1 {
