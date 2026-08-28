@@ -1,35 +1,31 @@
 /* ============================================================================
    POST /api/payments/create — начать оплату одной «Примерки» (полной или со
-   скидкой по коду партнёра), картой через Robokassa или переводом по СБП.
+   скидкой по коду партнёра) картой через Robokassa.
 
    Требует залогиненного пользователя (Supabase JWT в Authorization: Bearer).
    Сумма НИКОГДА не берётся из тела запроса — сервер сам вычисляет её как
    ровно одну «Примерку» (998₽, или 499₽, если есть непогашенный код
-   партнёра — см. hasAvailableDiscount в lib/wallet.js). Раньше клиент вводил
-   сумму пополнения вручную (свободный депозит) — убрано по прямой просьбе
-   пользователя: сумму приходилось гадать что при оплате картой, что при СБП,
-   а неверная сумма особенно мешала владельцу сайта вручную сверять СБП-заявки
-   на admin-sbp-orders.html. Если в будущем понадобится отдельная оплата
-   «Консультации виртуального стилиста» (другая цена) — это отдельный кейс,
-   пока на сайте нет ни одной кнопки, которая её вызывает.
+   партнёра — см. hasAvailableDiscount в lib/wallet.js). Если в будущем
+   понадобится отдельная оплата «Консультации виртуального стилиста» (другая
+   цена) — это отдельный кейс, пока на сайте нет ни одной кнопки, которая её
+   вызывает.
 
-   По умолчанию (или body.provider === 'robokassa') создаёт платёжную ссылку
-   в Robokassa — окончательное зачисление на баланс происходит только в
-   api/payments/webhook.js, после проверки подписи уведомления (см.
-   lib/payments/robokassa.js).
+   Создаёт платёжную ссылку в Robokassa — окончательное зачисление на баланс
+   происходит только в api/payments/webhook.js, после проверки подписи
+   уведомления (см. lib/payments/robokassa.js).
 
-   При body.provider === 'sbp' — временный ручной канал (см. lib/payments/sbp.js
-   и api/admin.js, action=sbp-confirm): вместо ссылки возвращает номер телефона
-   для перевода и короткий код заказа, зачисление подтверждает вручную владелец
-   сайта. Обе ветки пишут в одну и ту же таблицу payments (provider различает),
-   поэтому api/admin.js может завершить платёж той же функцией finalizeTopup,
-   что и вебхук Robokassa.
+   Раньше был и второй способ — временный ручной канал СБП с зачислением по
+   честному слову владельца сайта (клиент переводил деньги лично ему, тот
+   сверял поступление в банковском приложении и подтверждал вручную через
+   admin-sbp-orders.html). Убран 2026-08-28 после того, как Robokassa
+   заработала полностью — вместо честного слова теперь всегда автоматическая
+   проверка подписи. Историю решения см. lib/payments/robokassa.js и
+   DEPLOY-payments.md.
    ============================================================================ */
 
 const { requireUser } = require('../../lib/auth');
 const { getSupabaseAdmin } = require('../../lib/supabaseAdmin');
 const { createPaymentLink } = require('../../lib/payments/robokassa');
-const { generateOrderCode } = require('../../lib/payments/sbp');
 const { hasAvailableDiscount } = require('../../lib/wallet');
 const PACKAGES = require('../../lib/packages');
 
@@ -51,42 +47,6 @@ module.exports = async function handler(req, res) {
 
   var discounted = await hasAvailableDiscount(user.id);
   var amountKopecks = discounted ? PACKAGES.PRIMERKA_DISCOUNT.priceKopecks : PACKAGES.PRIMERKA.priceKopecks;
-
-  var provider = (req.body && req.body.provider) === 'sbp' ? 'sbp' : 'robokassa';
-
-  if (provider === 'sbp') {
-    if (!process.env.SBP_PHONE || !process.env.SBP_BANK || !process.env.SBP_RECIPIENT_NAME) {
-      res.status(503).json({ error: 'Оплата по СБП пока не настроена на сервере.' });
-      return;
-    }
-    try {
-      var orderCode = generateOrderCode();
-      var supabaseSbp = getSupabaseAdmin();
-      var sbpInsert = await supabaseSbp.from('payments').insert({
-        user_id: user.id,
-        provider: 'sbp',
-        provider_payment_id: orderCode,
-        amount_kopecks: amountKopecks,
-        status: 'pending',
-        raw_payload: { orderCode: orderCode, discounted: discounted }
-      });
-      if (sbpInsert.error) throw sbpInsert.error;
-
-      res.status(200).json({
-        method: 'sbp',
-        orderCode: orderCode,
-        phone: process.env.SBP_PHONE,
-        bank: process.env.SBP_BANK,
-        recipientName: process.env.SBP_RECIPIENT_NAME,
-        amountKopecks: amountKopecks,
-        discounted: discounted
-      });
-    } catch (err) {
-      console.error('payments/create (sbp) error:', err);
-      res.status(502).json({ error: 'Не получилось создать заявку на оплату. Попробуйте ещё раз.' });
-    }
-    return;
-  }
 
   if (!process.env.ROBOKASSA_MERCHANT_LOGIN || !process.env.ROBOKASSA_PASSWORD1) {
     res.status(503).json({ error: 'Оплата пока не настроена на сервере.' });
