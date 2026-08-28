@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Выдача кода — служебная страница</title>
+<title>Партнёры и коды — служебная страница</title>
 <meta name="robots" content="noindex, nofollow">
 
 <link rel="stylesheet" href="css/tokens.css?v=7">
@@ -12,70 +12,335 @@
 <link rel="stylesheet" href="css/components/button-3d.css?v=3">
 <link rel="stylesheet" href="css/cabinet.css?v=2">
 <style>
-  body { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 24px; }
-  .admin-card { max-width: 480px; width: 100%; padding: 32px; border-radius: 18px; background: rgba(255,255,255,.55); border: 1px solid var(--glow-silver); }
+  body { padding: 24px; display: flex; justify-content: center; }
+  .admin-wrap { max-width: 920px; width: 100%; }
+  .admin-card { padding: 28px 32px; border-radius: 18px; background: rgba(255,255,255,.55); border: 1px solid var(--glow-silver); margin: 0 0 24px; }
   .admin-card h1 { font-family: var(--font-display); font-size: 1.5rem; font-weight: 500; margin: 0 0 8px; }
-  .admin-card p { font-family: var(--font-body); color: var(--text-muted); font-size: .92rem; line-height: 1.6; margin: 0 0 20px; }
+  .admin-card h2 { font-family: var(--font-display); font-size: 1.15rem; font-weight: 500; margin: 0 0 14px; }
+  .admin-card p { font-family: var(--font-body); color: var(--text-muted); font-size: .92rem; line-height: 1.6; margin: 0 0 18px; }
   .admin-field { margin-bottom: 14px; }
   .admin-field label { display: block; font-family: var(--font-body); font-size: .82rem; color: var(--text-muted); margin-bottom: 6px; }
   .admin-field input { width: 100%; box-sizing: border-box; padding: 12px 16px; border-radius: 12px; border: 1px solid var(--glow-silver); background: rgba(255,255,255,.6); font-family: var(--font-body); font-size: .96rem; color: var(--text-primary); }
-  .admin-result { margin-top: 18px; padding: 14px 16px; border-radius: 12px; background: rgba(255,255,255,.6); border: 1px solid var(--glow-silver); font-family: var(--font-body); font-size: 1.05rem; letter-spacing: .04em; word-break: break-all; display: none; }
-  .admin-result.is-error { color: #b23b3b; }
-  .admin-card .btn-3d { width: 100%; margin-top: 4px; }
+  .admin-row { display: flex; gap: 12px; flex-wrap: wrap; }
+  .admin-row .admin-field { flex: 1; min-width: 180px; }
+  .admin-msg { margin-top: 14px; font-family: var(--font-body); font-size: .92rem; color: var(--text-muted); }
+  .admin-msg.is-error { color: #b23b3b; }
+  .admin-card .btn-3d { margin-top: 4px; }
+
+  .partner-table-wrap { overflow-x: auto; }
+  .partner-table { width: 100%; border-collapse: collapse; font-family: var(--font-body); font-size: .88rem; }
+  .partner-table th, .partner-table td { text-align: left; padding: 12px 10px; border-bottom: 1px solid var(--glow-silver); vertical-align: top; }
+  .partner-table th { color: var(--text-muted); font-weight: 500; font-size: .76rem; text-transform: uppercase; letter-spacing: .04em; }
+  .partner-name-contact { color: var(--text-muted); font-size: .82rem; margin-top: 2px; }
+  .partner-status { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: .76rem; white-space: nowrap; }
+  .partner-status--active { background: rgba(120,180,120,.18); color: #3b7a3b; }
+  .partner-status--inactive { background: rgba(180,120,120,.15); color: #a04a4a; }
+  .partner-actions { min-width: 190px; }
+  .partner-actions .btn-3d { padding: 8px 12px; font-size: .8rem; width: 100%; margin-top: 6px; }
+  .partner-issue-row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  .partner-issue-row input[type=number] { width: 56px; padding: 8px 8px; border-radius: 8px; border: 1px solid var(--glow-silver); font-size: .85rem; text-align: center; }
+  .partner-issue-row input[type=text] { flex: 1; min-width: 100px; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--glow-silver); font-size: .85rem; }
+  .partner-codes-out { margin-top: 8px; padding: 10px 12px; border-radius: 10px; background: rgba(255,255,255,.6); border: 1px solid var(--glow-silver); font-family: var(--font-body); font-size: .85rem; white-space: pre-wrap; word-break: break-all; display: none; }
+  .partner-empty { font-family: var(--font-body); font-style: italic; color: var(--text-faint); }
 </style>
 </head>
 <body>
 
-<div class="admin-card">
-  <h1>Выдача кода «Примерки»</h1>
-  <p>
-    Служебная страница, не для покупателей — не ссылается ниоткуда на сайте. Введите админ-ключ
-    (тот же, что в переменной окружения <code>ADMIN_KEY</code>) и любую метку для себя (например,
-    имя партнёра или дату) — код можно скопировать и передать продавцу или покупателю.
-  </p>
+<div class="admin-wrap">
 
-  <form id="genForm">
+  <div class="admin-card">
+    <h1>Партнёры и коды</h1>
+    <p>
+      Служебная страница, не для покупательниц — не ссылается ниоткуда на сайте. Заведите партнёра
+      и выдайте ему сразу нужное количество кодов «Примерки» — партнёр сам передаёт их покупательницам
+      по мере продаж, без вашего участия в каждой отдельной сделке. Здесь же видно, сколько кодов
+      выдано и сколько уже погашено.
+    </p>
     <div class="admin-field">
       <label for="adminKey">Админ-ключ</label>
       <input type="password" id="adminKey" autocomplete="current-password">
     </div>
-    <div class="admin-field">
-      <label for="refInput">Метка (необязательно)</label>
-      <input type="text" id="refInput" placeholder="Например: ANNA-12AVG" autocomplete="off">
-    </div>
-    <button type="submit" class="btn-3d btn-3d--rect">Сгенерировать код</button>
-  </form>
+    <button type="button" id="loadBtn" class="btn-3d btn-3d--rect">Показать партнёров</button>
+    <div class="admin-msg" id="topMsg" style="display:none"></div>
+  </div>
 
-  <div class="admin-result" id="genResult"></div>
+  <div class="admin-card" id="addPartnerCard" style="display:none">
+    <h2>Добавить партнёра</h2>
+    <form id="addPartnerForm">
+      <div class="admin-row">
+        <div class="admin-field">
+          <label for="partnerName">Название *</label>
+          <input type="text" id="partnerName" required placeholder="Например: Бутик «Анна»">
+        </div>
+        <div class="admin-field">
+          <label for="partnerContact">Контакт</label>
+          <input type="text" id="partnerContact" placeholder="Телефон / Telegram / email">
+        </div>
+      </div>
+      <div class="admin-field">
+        <label for="partnerNotes">Заметка</label>
+        <input type="text" id="partnerNotes" placeholder="Необязательно — для себя">
+      </div>
+      <button type="submit" class="btn-3d btn-3d--rect">Добавить партнёра</button>
+    </form>
+    <div class="admin-msg" id="addMsg" style="display:none"></div>
+  </div>
+
+  <div class="admin-card" id="partnersCard" style="display:none">
+    <h2>Партнёры</h2>
+    <div class="partner-table-wrap">
+      <table class="partner-table">
+        <thead>
+          <tr>
+            <th>Партнёр</th>
+            <th>Статус</th>
+            <th>Выдано</th>
+            <th>Погашено</th>
+            <th>Заказов / выручка</th>
+            <th>Действия</th>
+          </tr>
+        </thead>
+        <tbody id="partnerTbody"></tbody>
+      </table>
+    </div>
+  </div>
+
   <p style="margin-top:20px"><a href="admin-sbp-orders.html">Заявки на оплату по СБП →</a></p>
 </div>
 
 <script>
 (function () {
-  var form = document.getElementById('genForm');
-  var resultBox = document.getElementById('genResult');
-  form.addEventListener('submit', function (e) {
-    e.preventDefault();
-    var adminKey = document.getElementById('adminKey').value;
-    var ref = document.getElementById('refInput').value;
-    resultBox.className = 'admin-result';
-    resultBox.style.display = 'block';
-    resultBox.textContent = 'Генерирую…';
+  var adminKeyInput = document.getElementById('adminKey');
+  var loadBtn = document.getElementById('loadBtn');
+  var topMsg = document.getElementById('topMsg');
+  var addPartnerCard = document.getElementById('addPartnerCard');
+  var partnersCard = document.getElementById('partnersCard');
+  var partnerTbody = document.getElementById('partnerTbody');
+  var addPartnerForm = document.getElementById('addPartnerForm');
+  var addMsg = document.getElementById('addMsg');
+
+  function showMsg(el, text, isError) {
+    el.style.display = text ? 'block' : 'none';
+    el.textContent = text || '';
+    el.className = 'admin-msg' + (isError ? ' is-error' : '');
+  }
+
+  function formatRub(kopecks) {
+    return (kopecks / 100).toLocaleString('ru-RU', { maximumFractionDigits: 2 }) + ' ₽';
+  }
+
+  function adminKey() {
+    return adminKeyInput.value;
+  }
+
+  function loadPartners() {
+    if (!adminKey()) {
+      showMsg(topMsg, 'Введите админ-ключ.', true);
+      return;
+    }
+    showMsg(topMsg, 'Загружаю…');
+    loadBtn.setAttribute('disabled', '');
+
+    fetch('api/admin?action=list-partners', { headers: { 'X-Admin-Key': adminKey() } })
+      .then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); })
+      .then(function (r) {
+        if (!r.ok) throw new Error(r.data.error || 'Не получилось загрузить партнёров.');
+        showMsg(topMsg, '');
+        addPartnerCard.style.display = 'block';
+        partnersCard.style.display = 'block';
+        renderPartners(r.data.partners);
+      })
+      .catch(function (err) {
+        showMsg(topMsg, err.message, true);
+      })
+      .then(function () {
+        loadBtn.removeAttribute('disabled');
+      });
+  }
+
+  function renderPartners(partners) {
+    partnerTbody.innerHTML = '';
+
+    if (!partners.length) {
+      var emptyRow = document.createElement('tr');
+      var emptyCell = document.createElement('td');
+      emptyCell.colSpan = 6;
+      emptyCell.className = 'partner-empty';
+      emptyCell.textContent = 'Партнёров пока нет — добавьте первого выше.';
+      emptyRow.appendChild(emptyCell);
+      partnerTbody.appendChild(emptyRow);
+      return;
+    }
+
+    partners.forEach(function (partner) {
+      var row = document.createElement('tr');
+
+      var nameCell = document.createElement('td');
+      var nameStrong = document.createElement('strong');
+      nameStrong.textContent = partner.name;
+      nameCell.appendChild(nameStrong);
+      if (partner.contact) {
+        var contactDiv = document.createElement('div');
+        contactDiv.className = 'partner-name-contact';
+        contactDiv.textContent = partner.contact;
+        nameCell.appendChild(contactDiv);
+      }
+      row.appendChild(nameCell);
+
+      var statusCell = document.createElement('td');
+      var statusBadge = document.createElement('span');
+      statusBadge.className = 'partner-status partner-status--' + partner.status;
+      statusBadge.textContent = partner.status === 'active' ? 'Активен' : 'Неактивен';
+      statusCell.appendChild(statusBadge);
+      row.appendChild(statusCell);
+
+      var issuedCell = document.createElement('td');
+      issuedCell.textContent = String(partner.codes_issued);
+      row.appendChild(issuedCell);
+
+      var redeemedCell = document.createElement('td');
+      redeemedCell.textContent = String(partner.codes_redeemed);
+      row.appendChild(redeemedCell);
+
+      var revenueCell = document.createElement('td');
+      revenueCell.textContent = partner.orders_completed + ' / ' + formatRub(partner.revenue_kopecks);
+      row.appendChild(revenueCell);
+
+      var actionsCell = document.createElement('td');
+      actionsCell.className = 'partner-actions';
+
+      var issueRow = document.createElement('div');
+      issueRow.className = 'partner-issue-row';
+      var countInput = document.createElement('input');
+      countInput.type = 'number';
+      countInput.min = '1';
+      countInput.max = '50';
+      countInput.value = '1';
+      var noteInput = document.createElement('input');
+      noteInput.type = 'text';
+      noteInput.placeholder = 'Заметка';
+      issueRow.appendChild(countInput);
+      issueRow.appendChild(noteInput);
+      actionsCell.appendChild(issueRow);
+
+      var issueBtn = document.createElement('button');
+      issueBtn.type = 'button';
+      issueBtn.className = 'btn-3d btn-3d--rect';
+      issueBtn.textContent = 'Выдать код(ы)';
+      actionsCell.appendChild(issueBtn);
+
+      var codesOut = document.createElement('div');
+      codesOut.className = 'partner-codes-out';
+      actionsCell.appendChild(codesOut);
+
+      issueBtn.addEventListener('click', function () {
+        issueCodes(partner, countInput.value, noteInput.value, issueBtn, codesOut);
+      });
+
+      var toggleBtn = document.createElement('button');
+      toggleBtn.type = 'button';
+      toggleBtn.className = 'btn-3d btn-3d--rect';
+      toggleBtn.textContent = partner.status === 'active' ? 'Деактивировать' : 'Активировать';
+      toggleBtn.addEventListener('click', function () {
+        toggleStatus(partner, toggleBtn);
+      });
+      actionsCell.appendChild(toggleBtn);
+
+      row.appendChild(actionsCell);
+      partnerTbody.appendChild(row);
+    });
+  }
+
+  function issueCodes(partner, countValue, note, button, out) {
+    var count = parseInt(countValue, 10) || 1;
+    button.setAttribute('disabled', '');
+    out.style.display = 'none';
+
     fetch('api/admin', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'generate-code', adminKey: adminKey, ref: ref })
+      body: JSON.stringify({
+        action: 'generate-code',
+        adminKey: adminKey(),
+        partnerId: partner.partner_id,
+        count: count,
+        note: note
+      })
     })
       .then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); })
       .then(function (r) {
-        if (!r.ok) throw new Error(r.data.error || 'Не получилось сгенерировать код.');
-        resultBox.textContent = r.data.code;
+        if (!r.ok) throw new Error(r.data.error || 'Не получилось выдать коды.');
+        out.style.display = 'block';
+        out.textContent = r.data.codes.join('\n');
+        loadPartners();
       })
       .catch(function (err) {
-        resultBox.className = 'admin-result is-error';
-        resultBox.textContent = err.message;
+        out.style.display = 'block';
+        out.textContent = err.message;
+      })
+      .then(function () {
+        button.removeAttribute('disabled');
+      });
+  }
+
+  function toggleStatus(partner, button) {
+    var newStatus = partner.status === 'active' ? 'inactive' : 'active';
+    button.setAttribute('disabled', '');
+
+    fetch('api/admin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'set-partner-status',
+        adminKey: adminKey(),
+        partnerId: partner.partner_id,
+        status: newStatus
+      })
+    })
+      .then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); })
+      .then(function (r) {
+        if (!r.ok) throw new Error(r.data.error || 'Не получилось изменить статус.');
+        loadPartners();
+      })
+      .catch(function (err) {
+        showMsg(topMsg, err.message, true);
+        button.removeAttribute('disabled');
+      });
+  }
+
+  addPartnerForm.addEventListener('submit', function (e) {
+    e.preventDefault();
+    if (!adminKey()) {
+      showMsg(addMsg, 'Введите админ-ключ выше.', true);
+      return;
+    }
+    var name = document.getElementById('partnerName').value.trim();
+    if (!name) {
+      showMsg(addMsg, 'Укажите название партнёра.', true);
+      return;
+    }
+    var contact = document.getElementById('partnerContact').value.trim();
+    var notes = document.getElementById('partnerNotes').value.trim();
+    showMsg(addMsg, 'Добавляю…');
+
+    fetch('api/admin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'add-partner', adminKey: adminKey(), name: name, contact: contact, notes: notes })
+    })
+      .then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); })
+      .then(function (r) {
+        if (!r.ok) throw new Error(r.data.error || 'Не получилось добавить партнёра.');
+        showMsg(addMsg, '');
+        addPartnerForm.reset();
+        loadPartners();
+      })
+      .catch(function (err) {
+        showMsg(addMsg, err.message, true);
       });
   });
+
+  loadBtn.addEventListener('click', loadPartners);
 })();
 </script>
 

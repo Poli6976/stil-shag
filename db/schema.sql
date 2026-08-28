@@ -514,3 +514,72 @@ create policy "looks_bucket_owner_read" on storage.objects
 
 create policy "looks_bucket_owner_delete" on storage.objects
   for delete using (bucket_id = 'looks' and (storage.foldername(name))[1] = auth.uid()::text);
+
+-- ---------------------------------------------------------------------------
+-- 2026-08-28: Партнёрская CRM — учёт партнёров и выданных им кодов.
+--
+-- Бизнес-модель (подтверждена владельцем): сайт партнёру ничего не должен и
+-- наоборот — комиссия/расчёты не ведутся. Партнёр получает от владельца сайта
+-- пачку кодов заранее (не по одному на каждую продажу) и сам раздаёт их
+-- покупательницам вне сайта; выгода сайта — приток новых клиенток. Эти таблицы
+-- нужны не для денег, а для учёта: кто партнёр и сколько кодов ему реально
+-- выдано/погашено.
+--
+-- Формула самого кода (lib/partnerCode.js) не изменилась — код по-прежнему
+-- самодостаточен и не требует БД для ПРОВЕРКИ (api/redeem-code.js). Эта пара
+-- таблиц нужна только для статистики ВЫДАЧИ, которую формула сама не хранит
+-- (discount_credits появляется только в момент ПОГАШЕНИЯ кода покупательницей,
+-- см. выше в этом файле).
+-- ---------------------------------------------------------------------------
+
+create table if not exists public.partners (
+  id          uuid primary key default gen_random_uuid(),
+  name        text not null,
+  slug        text not null unique,
+  contact     text,
+  status      text not null default 'active' check (status in ('active', 'inactive')),
+  notes       text,
+  created_at  timestamptz not null default now()
+);
+
+create table if not exists public.partner_codes (
+  id          uuid primary key default gen_random_uuid(),
+  partner_id  uuid not null references public.partners(id) on delete cascade,
+  code        text not null unique,
+  ref         text not null,
+  note        text,
+  created_at  timestamptz not null default now()
+);
+
+create index if not exists partner_codes_partner_idx on public.partner_codes (partner_id);
+
+-- RLS: обе таблицы закрыты для anon/authenticated целиком — доступ только из
+-- api/admin.js сервисным ключом (тот же принцип, что у rate_limit_hits выше).
+-- Специально без select-политик — ни один покупатель не должен видеть список
+-- партнёров или чужие коды.
+alter table public.partners enable row level security;
+alter table public.partner_codes enable row level security;
+
+-- Статистика по партнёру: сколько кодов выдано (partner_codes), сколько из
+-- них реально погашено покупательницей (JOIN на discount_credits по code) и
+-- сколько дошло до заказа (JOIN на orders через order_id погашённого кредита)
+-- вместе с суммой заказов. Читает только api/admin.js сервисным ключом,
+-- который обходит RLS в любом случае.
+create or replace view public.partner_stats as
+select
+  p.id as partner_id,
+  p.name,
+  p.slug,
+  p.contact,
+  p.status,
+  p.notes,
+  p.created_at,
+  count(pc.id) as codes_issued,
+  count(dc.id) as codes_redeemed,
+  count(o.id) as orders_completed,
+  coalesce(sum(o.price_kopecks), 0) as revenue_kopecks
+from public.partners p
+left join public.partner_codes pc on pc.partner_id = p.id
+left join public.discount_credits dc on dc.code = pc.code
+left join public.orders o on o.id = dc.order_id
+group by p.id, p.name, p.slug, p.contact, p.status, p.notes, p.created_at;
