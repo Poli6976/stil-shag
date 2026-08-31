@@ -360,7 +360,7 @@
     var isTeen = answers.age === 'teen';
     var tpl = isTeen ? templateSet.teen : (templateSet[answers.occasion] || templateSet.office);
     var layers = applyItemToLayers(tpl.layers, answers.item);
-    return { tpl: tpl, layers: layers };
+    return { tpl: tpl, layers: layers, isMale: isMale };
   }
 
   /* Списывает право на образ (бесплатный первый / скидка / полная цена —
@@ -380,7 +380,12 @@
         'Content-Type': 'application/json',
         'Authorization': 'Bearer ' + currentSession.access_token
       },
-      body: JSON.stringify({ layers: built.layers, why: built.tpl.why, fit: answers.fit || '' })
+      body: JSON.stringify({
+        layers: built.layers,
+        why: built.tpl.why,
+        fit: answers.fit || '',
+        gender: built.isMale ? 'male' : 'female'
+      })
     })
       .then(function (res) {
         if (!res.ok) {

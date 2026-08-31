@@ -25,11 +25,11 @@ const { previewLookEntitlement, chargeForLook } = require('../../lib/lookAccess'
 const { generateLookImage, buildLookImagePrompt } = require('../../lib/yandexart');
 const { saveLook } = require('../../lib/savedLooks');
 
-async function tryGenerateImage(layers, fit) {
+async function tryGenerateImage(layers, fit, gender) {
   if (!process.env.YANDEX_API_KEY || !process.env.YANDEX_FOLDER_ID) return null;
   if (!layers || !Object.keys(layers).length) return null;
   try {
-    return await generateLookImage(buildLookImagePrompt(layers, fit));
+    return await generateLookImage(buildLookImagePrompt(layers, fit, null, gender));
   } catch (err) {
     console.error('looks/charge: не удалось сгенерировать картинку:', err);
     return null;
@@ -56,6 +56,7 @@ module.exports = async function handler(req, res) {
   var layers = (body.layers && typeof body.layers === 'object') ? body.layers : {};
   var why = typeof body.why === 'string' ? body.why.slice(0, 500) : '';
   var fit = typeof body.fit === 'string' ? body.fit.slice(0, 200) : '';
+  var gender = body.gender === 'male' ? 'male' : 'female'; // дефолт сайта, если не прислали
 
   try {
     var entitled = await previewLookEntitlement(user.id);
@@ -69,7 +70,7 @@ module.exports = async function handler(req, res) {
     return;
   }
 
-  var imageBase64 = await tryGenerateImage(layers, fit);
+  var imageBase64 = await tryGenerateImage(layers, fit, gender);
 
   try {
     var result = await chargeForLook(user.id);
