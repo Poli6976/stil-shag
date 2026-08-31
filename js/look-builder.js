@@ -86,6 +86,16 @@
       'Подробнее — <a href="legal-privacy.html" target="_blank" rel="noopener">Политика конфиденциальности</a>.'
     ));
 
+    var itemHintField = el('div', 'wizard-field');
+    var itemHintLabel = el('label', null, 'Уточните деталь одежды — необязательно, поможет ИИ точнее распознать вещь');
+    itemHintLabel.setAttribute('for', 'lbItemHint');
+    var itemHintInput = el('input', 'wizard-input');
+    itemHintInput.id = 'lbItemHint';
+    itemHintInput.type = 'text';
+    itemHintInput.placeholder = 'Например: это куртка, а не рубашка';
+    itemHintField.appendChild(itemHintLabel);
+    itemHintField.appendChild(itemHintInput);
+
     var fitField = el('div', 'wizard-field');
     var fitLabel = el('label', null, 'Рост и размер — необязательно, но поможет с посадкой и длиной вещей');
     fitLabel.setAttribute('for', 'lbFit');
@@ -156,19 +166,20 @@
     box.appendChild(status);
     box.appendChild(consentWrap);
     root.appendChild(box);
+    root.appendChild(itemHintField);
     root.appendChild(fitField);
 
     var actions = el('div', 'lb-actions');
     goBtn.addEventListener('click', function (e) {
       e.preventDefault();
       if (goBtn.hasAttribute('disabled') || !state.dataUrl || !consentCheckbox.checked) return;
-      submitLook(status, goBtn, fitInput.value);
+      submitLook(status, goBtn, fitInput.value, itemHintInput.value);
     });
     actions.appendChild(goBtn);
     root.appendChild(actions);
   }
 
-  function submitLook(status, goBtn, fit) {
+  function submitLook(status, goBtn, fit, itemHint) {
     goBtn.setAttribute('disabled', '');
     goBtn.setAttribute('aria-disabled', 'true');
     status.textContent = 'Разбираю фото и собираю образ — это может занять до 30 секунд…';
@@ -180,7 +191,7 @@
         'Content-Type': 'application/json',
         'Authorization': 'Bearer ' + (state.session ? state.session.access_token : '')
       },
-      body: JSON.stringify({ image: state.dataUrl, fit: fit })
+      body: JSON.stringify({ image: state.dataUrl, fit: fit, itemHint: itemHint })
     })
       .then(function (res) {
         if (!res.ok) {

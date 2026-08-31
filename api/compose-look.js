@@ -140,9 +140,14 @@ module.exports = async function handler(req, res) {
     }
 
     var fit = typeof body.fit === 'string' ? body.fit.trim().slice(0, 200) : '';
+    var itemHint = typeof body.itemHint === 'string' ? body.itemHint.trim().slice(0, 200) : '';
     var userText = fit
       ? 'Собери образ по фото. Рост и размер: ' + fit
       : 'Собери образ по фото.';
+    if (itemHint) {
+      userText += ' Уточнение от пользователя про вещь на фото — доверяй ему больше, чем своей ' +
+        'догадке по картинке, если оно расходится с тем, что ты видишь: ' + itemHint;
+    }
 
     var token = await getAccessToken();
     var fileId = await uploadFile(token, imageBuffer, mime);
