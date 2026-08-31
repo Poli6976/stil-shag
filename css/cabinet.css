@@ -273,9 +273,15 @@
   margin: 0;
 }
 
-.saved-look-card__delete {
-  align-self: flex-start;
+.saved-look-card__actions {
   margin-top: auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.saved-look-card__delete,
+.saved-look-card__copy {
   border: 1px solid var(--glow-silver);
   background: none;
   border-radius: 999px;
@@ -284,9 +290,12 @@
   font-size: 0.76rem;
   letter-spacing: var(--tracking-wide);
   text-transform: uppercase;
-  color: #b23b3b;
   cursor: pointer;
   transition: background 0.2s ease, color 0.2s ease;
+}
+
+.saved-look-card__delete {
+  color: #b23b3b;
 }
 
 .saved-look-card__delete:hover {
@@ -297,6 +306,15 @@
 .saved-look-card__delete[disabled] {
   opacity: 0.55;
   pointer-events: none;
+}
+
+.saved-look-card__copy {
+  color: var(--accent-gold-ink);
+}
+
+.saved-look-card__copy:hover {
+  background: var(--glow-gold);
+  color: var(--text-primary);
 }
 
 @media (max-width: 640px) {

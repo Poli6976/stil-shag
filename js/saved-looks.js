@@ -6,6 +6,41 @@
 
 (function () {
   var LAYER_LABELS = ['Верх', 'Низ', 'Верхняя одежда', 'Обувь', 'Аксессуары', 'Причёска', 'Макияж'];
+  /* Причёску и макияж в подпись для Telegram не берём — для поста это
+     наименее интересные слои, а длинная простыня из всех 7 плохо читается
+     как соцсеть-контент (см. обсуждение с пользователем). */
+  var TELEGRAM_LAYER_LABELS = ['Верх', 'Низ', 'Верхняя одежда', 'Обувь', 'Аксессуары'];
+
+  function buildTelegramCaption(look) {
+    var layers = look.layers || {};
+    var lines = TELEGRAM_LAYER_LABELS
+      .filter(function (key) { return layers[key]; })
+      .map(function (key) { return key + ': ' + layers[key]; });
+    return 'Новый образ 👇\n' + lines.join('\n') +
+      '\n\nСвою вещь разберём точно так же — первый образ бесплатно → https://stil-shag.ru/how-it-works.html';
+  }
+
+  function copyToClipboard(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      return navigator.clipboard.writeText(text);
+    }
+    return new Promise(function (resolve, reject) {
+      try {
+        var ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        resolve();
+      } catch (e) {
+        reject(e);
+      }
+    });
+  }
 
   function el(tag, className, text) {
     var node = document.createElement(tag);
@@ -56,6 +91,24 @@
       .join(' · ');
     if (layersText) body.appendChild(el('p', 'saved-look-card__layers', layersText));
 
+    var actions = el('div', 'saved-look-card__actions');
+
+    var copyBtn = el('button', 'saved-look-card__copy', 'Для Telegram');
+    copyBtn.type = 'button';
+    copyBtn.addEventListener('click', function () {
+      var caption = buildTelegramCaption(look);
+      copyToClipboard(caption)
+        .then(function () {
+          var original = copyBtn.textContent;
+          copyBtn.textContent = 'Скопировано — сохраните фото ↑';
+          setTimeout(function () { copyBtn.textContent = original; }, 3000);
+        })
+        .catch(function () {
+          window.alert('Не получилось скопировать автоматически. Подпись для поста:\n\n' + caption);
+        });
+    });
+    actions.appendChild(copyBtn);
+
     var deleteBtn = el('button', 'saved-look-card__delete', 'Удалить');
     deleteBtn.type = 'button';
     deleteBtn.addEventListener('click', function () {
@@ -73,7 +126,9 @@
           deleteBtn.removeAttribute('disabled');
         });
     });
-    body.appendChild(deleteBtn);
+    actions.appendChild(deleteBtn);
+
+    body.appendChild(actions);
 
     card.appendChild(body);
     grid.appendChild(card);
