@@ -581,6 +581,68 @@ body:has(.page-cta) {
   color: var(--text-muted);
 }
 
+/* ---------- отзывы ---------- */
+.review-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+
+.review-card {
+  padding: clamp(24px, 3vw, 32px);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.4);
+  border: 1px solid var(--glow-silver);
+}
+
+:root[data-theme="light"] .review-card {
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.review-card blockquote {
+  margin: 0;
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 400;
+  font-size: 1.1rem;
+  line-height: 1.5;
+  color: var(--text-primary);
+}
+
+.review-card cite {
+  display: block;
+  margin-top: 14px;
+  font-style: normal;
+  font-family: var(--font-body);
+  font-size: 0.92rem;
+  color: var(--text-muted);
+}
+
+/* ---------- второстепенная кнопка-аутлайн (напр. подписка на канал) ----------
+   Отдельная от .btn-3d: та зарезервирована под единственное основное
+   действие страницы, вторая золотая заливка рядом с ней спорила бы за
+   внимание. Эта — контурная, явно более тихая. */
+.btn-outline {
+  display: inline-block;
+  margin-top: 14px;
+  padding: 12px 26px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--glow-gold);
+  font-family: var(--font-body);
+  font-size: 0.82rem;
+  font-weight: 500;
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  text-decoration: none;
+  color: var(--accent-gold-ink);
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.btn-outline:hover {
+  background: var(--glow-gold);
+  color: var(--text-primary);
+}
+
 /* ---------- что внутри ---------- */
 .includes-grid {
   display: grid;
@@ -925,7 +987,8 @@ body:has(.page-cta) {
 
 /* ---------- планшет ---------- */
 @media (max-width: 900px) {
-  .recognition-grid {
+  .recognition-grid,
+  .review-grid {
     grid-template-columns: 1fr 1fr;
   }
 }
@@ -935,6 +998,7 @@ body:has(.page-cta) {
   .risk-grid,
   .recognition-grid,
   .includes-grid,
+  .review-grid,
   .steps-list {
     grid-template-columns: 1fr;
   }
