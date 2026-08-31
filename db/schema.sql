@@ -660,3 +660,29 @@ begin
   return coalesce(v_is_free, false);
 end;
 $$;
+
+-- ---------------------------------------------------------------------------
+-- 2026-08-31: отзывы клиенток (how-it-works.html). Отправляет клиентка через
+-- api/reviews.js (action=submit) под своим JWT, статус 'pending' до ручного
+-- одобрения владельцем (admin-reviews.html, api/reviews.js action=approve/
+-- reject). Тот же принцип, что у saved_looks выше — RLS не даёт читать/писать
+-- напрямую из браузера НИКАКИМ статусом, даже 'approved': публичный список
+-- одобренных отзывов отдаёт сам api/reviews.js (action=list-approved)
+-- service-role ключом, а не прямой запрос к таблице с anon-ключа.
+-- ---------------------------------------------------------------------------
+
+create table if not exists public.reviews (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid not null references auth.users(id) on delete cascade,
+  text        text not null,
+  age         integer,
+  status      text not null default 'pending' check (status in ('pending', 'approved')),
+  created_at  timestamptz not null default now()
+);
+
+create index if not exists reviews_status_created_idx
+  on public.reviews (status, created_at desc);
+
+alter table public.reviews enable row level security;
+-- Ни одной policy — ни pending, ни approved не читаются и не пишутся
+-- напрямую из браузера, только через service_role в api/reviews.js.

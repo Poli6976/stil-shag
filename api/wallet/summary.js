@@ -1,12 +1,14 @@
 /* ============================================================================
-   GET /api/wallet/summary — баланс + история операций одним запросом.
-   Раньше были отдельными api/wallet/balance.js и api/wallet/history.js —
-   объединены, чтобы освободить один слот в лимите Vercel Hobby (12
-   serverless-функций на деплой) под новый api/looks/saved.js.
+   GET /api/wallet/summary — баланс + история операций + статус скидки одним
+   запросом. Раньше были отдельными api/wallet/balance.js и
+   api/wallet/history.js — объединены, чтобы освободить слот в лимите Vercel
+   Hobby (12 serverless-функций на деплой) под api/looks/saved.js. 2026-08-31 —
+   сюда же вписан бывший api/discount/status.js, чтобы освободить ещё один
+   слот под api/reviews.js (отзывы клиенток).
    ============================================================================ */
 
 const { requireUser } = require('../../lib/auth');
-const { getBalance, getHistory } = require('../../lib/wallet');
+const { getBalance, getHistory, hasAvailableDiscount } = require('../../lib/wallet');
 
 module.exports = async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -27,7 +29,13 @@ module.exports = async function handler(req, res) {
   try {
     var wallet = await getBalance(user.id);
     var history = await getHistory(user.id);
-    res.status(200).json({ balanceKopecks: wallet.balanceKopecks, currency: wallet.currency, history: history });
+    var discount = await hasAvailableDiscount(user.id);
+    res.status(200).json({
+      balanceKopecks: wallet.balanceKopecks,
+      currency: wallet.currency,
+      history: history,
+      hasAvailableDiscount: discount
+    });
   } catch (err) {
     console.error('wallet/summary error:', err);
     res.status(500).json({ error: 'Не получилось загрузить кошелёк.' });

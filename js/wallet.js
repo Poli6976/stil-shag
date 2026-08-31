@@ -196,12 +196,14 @@
     var loggedOut = document.getElementById('authLoggedOut');
     var loggedIn = document.getElementById('authLoggedIn');
     var walletSection = document.getElementById('walletSection');
+    var reviewSection = document.getElementById('reviewSection');
     var emailEl = document.getElementById('authEmail');
 
     if (session) {
       if (loggedOut) loggedOut.style.display = 'none';
       if (loggedIn) loggedIn.style.display = 'block';
       if (walletSection) walletSection.style.display = 'block';
+      if (reviewSection) reviewSection.style.display = 'block';
       if (emailEl) emailEl.textContent = session.user.email;
       loadWallet(session);
       loadAvatar(session);
@@ -210,6 +212,7 @@
       if (loggedOut) loggedOut.style.display = 'block';
       if (loggedIn) loggedIn.style.display = 'none';
       if (walletSection) walletSection.style.display = 'none';
+      if (reviewSection) reviewSection.style.display = 'none';
       renderAvatar(null);
       var savedLooksSection = document.getElementById('savedLooksSection');
       if (savedLooksSection) savedLooksSection.style.display = 'none';

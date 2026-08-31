@@ -10,7 +10,7 @@
    одну Примерку со скидкой — повторно погасить его (в том числе в другом
    браузере) нельзя, а сама скидка списывается атомарно вместе с оплатой в
    api/orders/create.js. Статус скидки ниже запрашивается у сервера
-   (api/discount/status), а не хранится в localStorage. */
+   (api/wallet/summary), а не хранится в localStorage. */
 
 (function () {
   var WARDROBE_KEY = 'stil.wardrobe';
@@ -68,7 +68,7 @@
     window.stilAuth.getSession()
       .then(function (session) {
         if (!session) return null;
-        return fetch('api/discount/status', {
+        return fetch('api/wallet/summary', {
           headers: { 'Authorization': 'Bearer ' + session.access_token }
         }).then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); });
       })
@@ -202,8 +202,61 @@
     });
   }
 
+  function initReviewForm() {
+    var form = document.getElementById('reviewForm');
+    var textInput = document.getElementById('reviewText');
+    var ageInput = document.getElementById('reviewAge');
+    var msgBox = document.getElementById('reviewMsg');
+    var submitBtn = form ? form.querySelector('button[type="submit"]') : null;
+    if (!form || !textInput) return;
+
+    function showReviewMsg(text, variant) {
+      if (!msgBox) return;
+      msgBox.style.display = text ? 'block' : 'none';
+      msgBox.textContent = text || '';
+      msgBox.className = 'cabinet-status__msg' + (variant ? ' cabinet-status__msg--' + variant : '');
+    }
+
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var text = textInput.value.trim();
+      if (text.length < 10) {
+        showReviewMsg('Напишите чуть подробнее — пару предложений.', 'error');
+        return;
+      }
+      showReviewMsg('');
+      if (submitBtn) submitBtn.setAttribute('disabled', '');
+
+      Promise.resolve(window.stilAuth ? window.stilAuth.getSession() : null)
+        .then(function (session) {
+          if (!session) throw new Error('Сначала войдите в личный кабинет выше.');
+          return fetch('api/reviews', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer ' + session.access_token
+            },
+            body: JSON.stringify({ action: 'submit', text: text, age: ageInput ? ageInput.value : '' })
+          });
+        })
+        .then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); })
+        .then(function (r) {
+          if (!r.ok) throw new Error(r.data.error || 'Не получилось отправить отзыв.');
+          form.reset();
+          showReviewMsg('Спасибо! Отзыв отправлен на проверку.', 'success');
+        })
+        .catch(function (err) {
+          showReviewMsg(err.message, 'error');
+        })
+        .then(function () {
+          if (submitBtn) submitBtn.removeAttribute('disabled');
+        });
+    });
+  }
+
   renderStatus();
   renderWardrobe();
   initAddForm();
   initCodeForm();
+  initReviewForm();
 })();

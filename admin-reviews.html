@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="ru" data-theme="light">
+<head>
+<meta charset="utf-8">
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Отзывы — служебная страница</title>
+<meta name="robots" content="noindex, nofollow">
+
+<link rel="stylesheet" href="css/tokens.css?v=7">
+<link rel="stylesheet" href="css/base.css?v=2">
+<link rel="stylesheet" href="css/components/button-3d.css?v=3">
+<link rel="stylesheet" href="css/cabinet.css?v=2">
+<style>
+  body { padding: 24px; display: flex; justify-content: center; }
+  .admin-wrap { max-width: 760px; width: 100%; }
+  .admin-card { padding: 28px 32px; border-radius: 18px; background: rgba(255,255,255,.55); border: 1px solid var(--glow-silver); margin: 0 0 24px; }
+  .admin-card h1 { font-family: var(--font-display); font-size: 1.5rem; font-weight: 500; margin: 0 0 8px; }
+  .admin-card p { font-family: var(--font-body); color: var(--text-muted); font-size: .92rem; line-height: 1.6; margin: 0 0 18px; }
+  .admin-field { margin-bottom: 14px; }
+  .admin-field label { display: block; font-family: var(--font-body); font-size: .82rem; color: var(--text-muted); margin-bottom: 6px; }
+  .admin-field input { width: 100%; box-sizing: border-box; padding: 12px 16px; border-radius: 12px; border: 1px solid var(--glow-silver); background: rgba(255,255,255,.6); font-family: var(--font-body); font-size: .96rem; color: var(--text-primary); }
+  .admin-msg { margin-top: 14px; font-family: var(--font-body); font-size: .92rem; color: var(--text-muted); }
+  .admin-msg.is-error { color: #b23b3b; }
+  .admin-card .btn-3d { margin-top: 4px; }
+
+  .review-item { padding: 18px 20px; border-radius: 14px; background: rgba(255,255,255,.6); border: 1px solid var(--glow-silver); margin-bottom: 14px; }
+  .review-item p { font-family: var(--font-body); font-size: .98rem; line-height: 1.6; color: var(--text-primary); margin: 0 0 8px; }
+  .review-item .review-meta { font-family: var(--font-body); font-size: .8rem; color: var(--text-faint); margin-bottom: 12px; }
+  .review-item .review-actions { display: flex; gap: 10px; }
+  .review-item .btn-3d { padding: 8px 18px; font-size: .8rem; }
+  .review-empty { font-family: var(--font-body); font-style: italic; color: var(--text-faint); }
+</style>
+</head>
+<body>
+
+<div class="admin-wrap">
+
+  <div class="admin-card">
+    <h1>Модерация отзывов</h1>
+    <p>
+      Служебная страница, не для покупательниц — не ссылается ниоткуда на сайте. Отзывы клиентки
+      отправляют из личного кабинета, здесь — очередь на проверку. Одобренные сразу появляются в
+      разделе «Как это работает», отклонённые удаляются безвозвратно.
+    </p>
+    <div class="admin-field">
+      <label for="adminKey">Админ-ключ</label>
+      <input type="password" id="adminKey" autocomplete="current-password">
+    </div>
+    <button type="button" id="loadBtn" class="btn-3d btn-3d--rect">Показать отзывы на проверку</button>
+    <div class="admin-msg" id="topMsg" style="display:none"></div>
+  </div>
+
+  <div class="admin-card" id="reviewsCard" style="display:none">
+    <h1>Ожидают проверки</h1>
+    <div id="reviewsList"></div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var adminKeyInput = document.getElementById('adminKey');
+  var loadBtn = document.getElementById('loadBtn');
+  var topMsg = document.getElementById('topMsg');
+  var reviewsCard = document.getElementById('reviewsCard');
+  var reviewsList = document.getElementById('reviewsList');
+
+  function showMsg(el, text, isError) {
+    el.style.display = text ? 'block' : 'none';
+    el.textContent = text || '';
+    el.className = 'admin-msg' + (isError ? ' is-error' : '');
+  }
+
+  function adminKey() {
+    return adminKeyInput.value;
+  }
+
+  function loadReviews() {
+    if (!adminKey()) {
+      showMsg(topMsg, 'Введите админ-ключ.', true);
+      return;
+    }
+    showMsg(topMsg, 'Загружаю…');
+    loadBtn.setAttribute('disabled', '');
+
+    fetch('api/reviews?action=list-pending', { headers: { 'X-Admin-Key': adminKey() } })
+      .then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); })
+      .then(function (r) {
+        if (!r.ok) throw new Error(r.data.error || 'Не получилось загрузить отзывы.');
+        showMsg(topMsg, '');
+        reviewsCard.style.display = 'block';
+        renderReviews(r.data.reviews);
+      })
+      .catch(function (err) {
+        showMsg(topMsg, err.message, true);
+      })
+      .then(function () {
+        loadBtn.removeAttribute('disabled');
+      });
+  }
+
+  function renderReviews(reviews) {
+    reviewsList.innerHTML = '';
+
+    if (!reviews.length) {
+      var empty = document.createElement('p');
+      empty.className = 'review-empty';
+      empty.textContent = 'Отзывов на проверке пока нет.';
+      reviewsList.appendChild(empty);
+      return;
+    }
+
+    reviews.forEach(function (review) {
+      var item = document.createElement('div');
+      item.className = 'review-item';
+
+      var meta = document.createElement('div');
+      meta.className = 'review-meta';
+      meta.textContent = (review.age ? 'Возраст: ' + review.age + ' · ' : '') +
+        new Date(review.created_at).toLocaleString('ru-RU');
+      item.appendChild(meta);
+
+      var text = document.createElement('p');
+      text.textContent = review.text;
+      item.appendChild(text);
+
+      var actions = document.createElement('div');
+      actions.className = 'review-actions';
+
+      var approveBtn = document.createElement('button');
+      approveBtn.type = 'button';
+      approveBtn.className = 'btn-3d btn-3d--rect';
+      approveBtn.textContent = 'Одобрить';
+      approveBtn.addEventListener('click', function () {
+        moderate(review.id, 'approve', item, approveBtn);
+      });
+      actions.appendChild(approveBtn);
+
+      var rejectBtn = document.createElement('button');
+      rejectBtn.type = 'button';
+      rejectBtn.className = 'btn-3d btn-3d--rect';
+      rejectBtn.textContent = 'Отклонить';
+      rejectBtn.addEventListener('click', function () {
+        if (!window.confirm('Отклонить и удалить этот отзыв безвозвратно?')) return;
+        moderate(review.id, 'reject', item, rejectBtn);
+      });
+      actions.appendChild(rejectBtn);
+
+      item.appendChild(actions);
+      reviewsList.appendChild(item);
+    });
+  }
+
+  function moderate(id, action, item, button) {
+    button.setAttribute('disabled', '');
+
+    fetch('api/reviews', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: action, adminKey: adminKey(), id: id })
+    })
+      .then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); })
+      .then(function (r) {
+        if (!r.ok) throw new Error(r.data.error || 'Не получилось выполнить действие.');
+        item.remove();
+        if (!reviewsList.children.length) {
+          var empty = document.createElement('p');
+          empty.className = 'review-empty';
+          empty.textContent = 'Отзывов на проверке пока нет.';
+          reviewsList.appendChild(empty);
+        }
+      })
+      .catch(function (err) {
+        window.alert(err.message);
+        button.removeAttribute('disabled');
+      });
+  }
+
+  loadBtn.addEventListener('click', loadReviews);
+})();
+</script>
+
+</body>
+</html>
