@@ -166,8 +166,11 @@
     box.appendChild(status);
     box.appendChild(consentWrap);
     root.appendChild(box);
-    root.appendChild(itemHintField);
-    root.appendChild(fitField);
+
+    var fieldsRow = el('div', 'lb-fields-row');
+    fieldsRow.appendChild(itemHintField);
+    fieldsRow.appendChild(fitField);
+    root.appendChild(fieldsRow);
 
     var actions = el('div', 'lb-actions');
     goBtn.addEventListener('click', function (e) {
