@@ -62,31 +62,6 @@ body {
   gap: 0.75rem 1.5rem;
 }
 
-.page-header__account {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  border: 1px solid var(--glow-silver);
-  color: var(--text-muted);
-  text-decoration: none;
-  flex-shrink: 0;
-  transition: color 0.2s ease, border-color 0.2s ease;
-}
-
-.page-header__account:hover,
-.page-header__account.is-active {
-  color: var(--accent-gold-ink);
-  border-color: var(--glow-gold);
-}
-
-.page-header__account svg {
-  width: 18px;
-  height: 18px;
-}
-
 .page-header__toggle {
   display: none;
   font-family: var(--font-body);
@@ -1023,13 +998,6 @@ body:has(.page-cta) {
   .page-header__toggle {
     display: inline-flex;
     align-items: center;
-  }
-
-  /* .page-header__nav ниже получает flex-basis:100% и сама уходит на новую
-     строку — order:-1 удерживает иконку кабинета на первой строке рядом с
-     гамбургером, чтобы вход в кабинет был виден без открытия меню. */
-  .page-header__account {
-    order: -1;
   }
 
   .page-header__nav {
