@@ -671,6 +671,154 @@ $$;
 -- service-role ключом, а не прямой запрос к таблице с anon-ключа.
 -- ---------------------------------------------------------------------------
 
+-- ---------------------------------------------------------------------------
+-- 2026-09-06: программа лояльности перевёрнута — раньше бесплатный слот шёл
+-- ДО оплаты (первый образ был бесплатен всем без покупки), из-за чего можно
+-- было бесконечно фармить бесплатные образы новыми аккаунтами (оплата не
+-- нужна вообще, просто регистрируй новый email и получай бесплатный образ
+-- заново). Решение пользователя: бесплатные образы — награда ПОСЛЕ оплаты,
+-- а не аванс до неё. Полная цена (998 ₽) начисляет 2 следующих образа
+-- бесплатно, оплата по коду партнёра (499 ₽) — 1 следующий образ бесплатно.
+-- Суммарная щедрость (2 бесплатных на 1 платный при полной цене) не
+-- изменилась — изменился только порядок: сначала оплата, потом подарок.
+-- ---------------------------------------------------------------------------
+
+alter table public.wallets add column if not exists free_credits_remaining integer not null default 0;
+
+-- Разовый сброс счётчика под новую схему всем существующим кошелькам — на
+-- момент миграции в проекте всего 3 реально оплаченные Примерки за всё время
+-- (сверено с реестром Robokassa), риск задеть чей-то накопленный прогресс
+-- пренебрежимо мал.
+update public.wallets set looks_count = 0, free_credits_remaining = 0;
+
+-- Та же сигнатура и имя, что и раньше (см. определение выше) — атомарно
+-- проверяет и тратит один бесплатный образ, но теперь это просто пунш-карта:
+-- сколько начислила прошлая оплата, столько и можно потратить, без привязки
+-- к порядковому номеру образа.
+create or replace function public.consume_free_look_slot(p_user_id uuid)
+returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_consumed boolean;
+begin
+  update public.wallets
+    set free_credits_remaining = free_credits_remaining - 1,
+        looks_count = looks_count + 1,
+        updated_at = now()
+    where user_id = p_user_id and free_credits_remaining > 0
+    returning true into v_consumed;
+
+  return coalesce(v_consumed, false);
+end;
+$$;
+
+-- debit_wallet_for_package (полная цена, 998 ₽) — при успешном списании в той
+-- же транзакции начисляет 2 бесплатных образа вперёд. Остальное не менялось
+-- относительно определения выше.
+create or replace function public.debit_wallet_for_package(
+  p_user_id uuid,
+  p_package_code text,
+  p_price_kopecks bigint
+)
+returns table (order_id uuid, new_balance bigint)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_new_balance bigint;
+  v_tx_id uuid;
+  v_order_id uuid;
+begin
+  update public.wallets
+    set balance_kopecks = balance_kopecks - p_price_kopecks,
+        free_credits_remaining = free_credits_remaining + 2,
+        updated_at = now()
+    where user_id = p_user_id and balance_kopecks >= p_price_kopecks
+    returning balance_kopecks into v_new_balance;
+
+  if not found then
+    raise exception 'insufficient_funds' using errcode = 'P0001';
+  end if;
+
+  insert into public.wallet_transactions
+    (user_id, type, amount_kopecks, balance_after_kopecks, metadata)
+    values (p_user_id, 'debit', p_price_kopecks, v_new_balance, jsonb_build_object('package_code', p_package_code))
+    returning id into v_tx_id;
+
+  insert into public.orders (user_id, package_code, price_kopecks, wallet_transaction_id)
+    values (p_user_id, p_package_code, p_price_kopecks, v_tx_id)
+    returning id into v_order_id;
+
+  update public.wallet_transactions set order_id = v_order_id where id = v_tx_id;
+
+  return query select v_order_id, v_new_balance;
+end;
+$$;
+
+-- debit_wallet_for_discounted_primerka (по коду партнёра, 499 ₽) — то же
+-- самое, но начисляет только 1 бесплатный образ вперёд, не 2.
+create or replace function public.debit_wallet_for_discounted_primerka(
+  p_user_id uuid,
+  p_package_code text,
+  p_price_kopecks bigint
+)
+returns table (order_id uuid, new_balance bigint)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_credit_id uuid;
+  v_new_balance bigint;
+  v_tx_id uuid;
+  v_order_id uuid;
+begin
+  select id into v_credit_id
+    from public.discount_credits
+    where user_id = p_user_id and status = 'available'
+    order by created_at
+    limit 1
+    for update skip locked;
+
+  if v_credit_id is null then
+    raise exception 'no_discount_available' using errcode = 'P0001';
+  end if;
+
+  update public.wallets
+    set balance_kopecks = balance_kopecks - p_price_kopecks,
+        free_credits_remaining = free_credits_remaining + 1,
+        updated_at = now()
+    where user_id = p_user_id and balance_kopecks >= p_price_kopecks
+    returning balance_kopecks into v_new_balance;
+
+  if not found then
+    raise exception 'insufficient_funds' using errcode = 'P0001';
+  end if;
+
+  insert into public.wallet_transactions
+    (user_id, type, amount_kopecks, balance_after_kopecks, metadata)
+    values (p_user_id, 'debit', p_price_kopecks, v_new_balance,
+      jsonb_build_object('package_code', p_package_code, 'discount_credit_id', v_credit_id))
+    returning id into v_tx_id;
+
+  insert into public.orders (user_id, package_code, price_kopecks, wallet_transaction_id)
+    values (p_user_id, p_package_code, p_price_kopecks, v_tx_id)
+    returning id into v_order_id;
+
+  update public.wallet_transactions set order_id = v_order_id where id = v_tx_id;
+
+  update public.discount_credits
+    set status = 'used', used_at = now(), order_id = v_order_id
+    where id = v_credit_id;
+
+  return query select v_order_id, v_new_balance;
+end;
+$$;
+
 create table if not exists public.reviews (
   id          uuid primary key default gen_random_uuid(),
   user_id     uuid not null references auth.users(id) on delete cascade,

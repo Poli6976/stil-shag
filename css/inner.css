@@ -896,11 +896,39 @@ body:has(.page-cta) {
 }
 
 .price-card {
+  position: relative;
   padding: clamp(24px, 3vw, 32px);
   border-radius: 18px;
   background: rgba(255, 255, 255, 0.4);
   border: 1px solid var(--glow-silver);
   text-align: center;
+}
+
+.price-card--link {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.price-card--link:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.1);
+}
+
+/* "растянутая ссылка" — весь фон карточки кликабелен и ведёт на основной CTA,
+   а вложенные ссылки (программа «Примерка», код партнёра) остаются рабочими
+   поверх неё, без невалидной вложенности <a> в <a>. */
+.price-card__stretched-link {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+
+.price-card__inline-link {
+  position: relative;
+  z-index: 2;
 }
 
 :root[data-theme="light"] .price-card {

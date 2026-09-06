@@ -33,6 +33,7 @@ module.exports = async function handler(req, res) {
     res.status(200).json({
       balanceKopecks: wallet.balanceKopecks,
       currency: wallet.currency,
+      freeCreditsRemaining: wallet.freeCreditsRemaining,
       history: history,
       hasAvailableDiscount: discount
     });

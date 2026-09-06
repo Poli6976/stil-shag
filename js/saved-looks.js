@@ -17,7 +17,7 @@
       .filter(function (key) { return layers[key]; })
       .map(function (key) { return key + ': ' + layers[key]; });
     return 'Новый образ 👇\n' + lines.join('\n') +
-      '\n\nСвою вещь разберём точно так же — первый образ бесплатно → https://stil-shag.ru/how-it-works.html';
+      '\n\nСвою вещь разберём точно так же — 998 ₽, и два следующих образа бесплатно → https://stil-shag.ru/how-it-works.html';
   }
 
   function copyToClipboard(text) {

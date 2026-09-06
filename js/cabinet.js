@@ -54,15 +54,8 @@
     var msg = el('p', 'cabinet-status__msg');
     root.appendChild(msg);
 
-    if (count === 0) {
-      msg.innerHTML = 'Первый образ — бесплатно для всех, без покупки. <a href="online-stylist.html">Собрать сейчас →</a>';
-      return;
-    }
-
-    var fallbackMsg = 'Первый бесплатный образ уже использован. ' +
-      '<a href="online-stylist.html">Собрать ещё один образ →</a> (спишется с депозита, если хватает баланса). ' +
-      'Получили код от продавца при покупке? Введите его ниже — и следующая примерка будет со скидкой 50%.';
-    msg.innerHTML = fallbackMsg;
+    msg.innerHTML = 'Примерка — 998 ₽, или 499 ₽ по коду партнёра. ' +
+      '<a href="online-stylist.html">Собрать образ →</a>. После оплаты — бесплатные образы в подарок.';
 
     if (!window.stilAuth) return;
     window.stilAuth.getSession()
@@ -73,8 +66,13 @@
         }).then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); });
       })
       .then(function (r) {
-        if (r && r.ok && r.data.hasAvailableDiscount) {
-          msg.innerHTML = 'Код принят — следующая примерка со скидкой 50%. ' +
+        if (!r || !r.ok) return;
+        if (r.data.freeCreditsRemaining > 0) {
+          msg.innerHTML = 'У вас в подарок ' + r.data.freeCreditsRemaining +
+            (r.data.freeCreditsRemaining === 1 ? ' бесплатный образ' : ' бесплатных образа') +
+            '. <a href="online-stylist.html">Собрать образ →</a>';
+        } else if (r.data.hasAvailableDiscount) {
+          msg.innerHTML = 'Код принят — следующая примерка обойдётся в 499 ₽ вместо 998 ₽. ' +
             '<a href="online-stylist.html">Собрать образ →</a>';
         }
       })

@@ -61,7 +61,7 @@
 
         var box = el('div', 'auth-gate');
         box.appendChild(el('p', 'auth-gate__lead',
-          'Первый образ — бесплатно. Войдите по email, чтобы мы могли его засчитать — пришлём код для входа.'));
+          'Войдите по email, чтобы мы могли оформить и засчитать ваш образ — пришлём код для входа.'));
 
         var form = document.createElement('form');
         form.className = 'auth-gate__form';
