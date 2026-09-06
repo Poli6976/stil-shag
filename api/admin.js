@@ -19,6 +19,10 @@
        — завести нового партнёра
      POST body {action:'set-partner-status', adminKey, partnerId, status}
        — активировать/деактивировать партнёра (история кодов не удаляется)
+     POST body {action:'delete-partner', adminKey, partnerId}
+       — удалить партнёра насовсем (partner_codes каскадно удалится вслед за
+       ним — on delete cascade в db/schema.sql; уже погашенные покупательницами
+       коды в discount_credits при этом не трогаются, они хранятся отдельно)
      POST body {action:'generate-code', adminKey, partnerId, count, note}
        — выдать партнёру пачку кодов скидки программы «Примерка» (по умолчанию
        1, максимум 50 за раз)
@@ -40,6 +44,9 @@ module.exports = async function handler(req, res) {
   }
   if (req.method === 'POST' && action === 'set-partner-status') {
     return handleSetPartnerStatus(req, res);
+  }
+  if (req.method === 'POST' && action === 'delete-partner') {
+    return handleDeletePartner(req, res);
   }
   if (req.method === 'POST' && action === 'generate-code') {
     return handleGenerateCode(req, res);
@@ -135,6 +142,30 @@ async function handleSetPartnerStatus(req, res) {
   } catch (err) {
     console.error('admin set-partner-status error:', err);
     res.status(500).json({ error: 'Не получилось изменить статус партнёра.' });
+  }
+}
+
+async function handleDeletePartner(req, res) {
+  if (!checkAdminKey(req.body && req.body.adminKey)) {
+    res.status(401).json({ error: 'Неверный админ-ключ.' });
+    return;
+  }
+  if (!requireSupabaseEnv(res)) return;
+
+  var partnerId = req.body && req.body.partnerId;
+  if (!partnerId) {
+    res.status(400).json({ error: 'Не хватает partnerId.' });
+    return;
+  }
+
+  try {
+    var supabase = getSupabaseAdmin();
+    var result = await supabase.from('partners').delete().eq('id', partnerId);
+    if (result.error) throw result.error;
+    res.status(200).json({ ok: true });
+  } catch (err) {
+    console.error('admin delete-partner error:', err);
+    res.status(500).json({ error: 'Не получилось удалить партнёра.' });
   }
 }
 

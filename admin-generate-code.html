@@ -244,6 +244,15 @@
       });
       actionsCell.appendChild(toggleBtn);
 
+      var deleteBtn = document.createElement('button');
+      deleteBtn.type = 'button';
+      deleteBtn.className = 'btn-3d btn-3d--rect';
+      deleteBtn.textContent = 'Удалить';
+      deleteBtn.addEventListener('click', function () {
+        deletePartner(partner, deleteBtn);
+      });
+      actionsCell.appendChild(deleteBtn);
+
       row.appendChild(actionsCell);
       partnerTbody.appendChild(row);
     });
@@ -302,6 +311,32 @@
       .then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); })
       .then(function (r) {
         if (!r.ok) throw new Error(r.data.error || 'Не получилось изменить статус.');
+        loadPartners();
+      })
+      .catch(function (err) {
+        showMsg(topMsg, err.message, true);
+        button.removeAttribute('disabled');
+      });
+  }
+
+  function deletePartner(partner, button) {
+    var sure = window.confirm('Удалить партнёра «' + partner.name + '» насовсем? Все его коды тоже удалятся. Уже погашенные покупательницами коды в истории не пострадают. Отменить это действие нельзя.');
+    if (!sure) return;
+
+    button.setAttribute('disabled', '');
+
+    fetch('api/admin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'delete-partner',
+        adminKey: adminKey(),
+        partnerId: partner.partner_id
+      })
+    })
+      .then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); })
+      .then(function (r) {
+        if (!r.ok) throw new Error(r.data.error || 'Не получилось удалить партнёра.');
         loadPartners();
       })
       .catch(function (err) {
