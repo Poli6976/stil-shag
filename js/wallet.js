@@ -60,11 +60,34 @@
         if (!data.history.length) {
           historyEl.appendChild(el('li', 'wardrobe-empty', 'Операций пока нет'));
         }
-        data.history.forEach(function (tx) {
+        /* Показываем первые 5, остальное — по клику "Показать всю историю",
+           иначе у активной клиентки список растягивается на весь экран. */
+        data.history.forEach(function (tx, index) {
           var sign = tx.type === 'topup' ? '+ ' : '− ';
           var label = sign + formatRub(tx.amountKopecks) + ' · ' + new Date(tx.createdAt).toLocaleString('ru-RU');
-          historyEl.appendChild(el('li', 'wardrobe-item', label));
+          var li = el('li', 'wardrobe-item', label);
+          if (index >= 5) li.style.display = 'none';
+          historyEl.appendChild(li);
         });
+        if (data.history.length > 5) {
+          var toggleLi = document.createElement('li');
+          toggleLi.className = 'wardrobe-empty';
+          var toggleBtn = document.createElement('button');
+          toggleBtn.type = 'button';
+          toggleBtn.className = 'cabinet-link-btn';
+          toggleBtn.textContent = 'Показать всю историю';
+          toggleBtn.addEventListener('click', function () {
+            var expanded = toggleBtn.getAttribute('data-expanded') === '1';
+            var items = historyEl.querySelectorAll('li.wardrobe-item');
+            items.forEach(function (li, i) {
+              if (i >= 5) li.style.display = expanded ? 'none' : '';
+            });
+            toggleBtn.textContent = expanded ? 'Показать всю историю' : 'Свернуть';
+            toggleBtn.setAttribute('data-expanded', expanded ? '0' : '1');
+          });
+          toggleLi.appendChild(toggleBtn);
+          historyEl.appendChild(toggleLi);
+        }
       }
     } catch (e) {}
   }
