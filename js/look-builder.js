@@ -82,7 +82,7 @@
     consentWrap.appendChild(consentCheckbox);
     consentWrap.appendChild(el('span', null,
       'Согласен(на) на обработку фото (включая внешность) и параметров тела сервисами распознавания ' +
-      'изображений GigaChat и генерации YandexART — для сборки образа. Фото не хранится после ответа. ' +
+      'изображений GigaChat и генерации Yandex AI Studio — для сборки образа. Фото не хранится после ответа. ' +
       'Подробнее — <a href="legal-privacy.html" target="_blank" rel="noopener">Политика конфиденциальности</a>.'
     ));
 
