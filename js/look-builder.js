@@ -185,7 +185,7 @@
   function submitLook(status, goBtn, fit, itemHint) {
     goBtn.setAttribute('disabled', '');
     goBtn.setAttribute('aria-disabled', 'true');
-    status.textContent = 'Разбираю фото и собираю образ — это может занять до 30 секунд…';
+    status.textContent = 'Разбираю фото и собираю образ — это может занять до минуты…';
     status.className = 'lb-status';
 
     fetch('api/compose-look', {
