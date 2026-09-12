@@ -8,6 +8,13 @@
      GET  query {action:'list-approved'}
        — публичный список одобренных отзывов, без авторизации (для
        how-it-works.html).
+     GET  query {action:'list-looks'}
+       — публичный список примеров образов, без авторизации (блок «Примеры
+       готовых образов» на how-it-works.html). Управление образами —
+       admin-looks.html / api/admin.js (action=list-site-looks/add-site-look/
+       delete-site-look), не здесь — сюда сведено только публичное чтение,
+       чтобы не заводить под него отдельный serverless-файл (см. комментарий
+       в api/admin.js про лимит 12 функций на Vercel Hobby).
      GET  query {action:'list-pending'} + заголовок X-Admin-Key
        — очередь на модерацию (admin-reviews.html).
      POST body {action:'approve', adminKey, id}
@@ -33,8 +40,11 @@ module.exports = async function handler(req, res) {
   if (req.method === 'GET' && action === 'list-pending') return handleListPending(req, res);
   if (req.method === 'POST' && action === 'approve') return handleApprove(req, res);
   if (req.method === 'POST' && action === 'reject') return handleReject(req, res);
+  if (req.method === 'GET' && action === 'list-looks') return handleListLooks(req, res);
   res.status(400).json({ error: 'Неизвестное действие.' });
 };
+
+const SITE_LOOKS_BUCKET = 'site-looks';
 
 function requireSupabaseEnv(res) {
   if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
@@ -145,6 +155,28 @@ async function handleApprove(req, res) {
   } catch (err) {
     console.error('reviews approve error:', err);
     res.status(500).json({ error: 'Не получилось одобрить отзыв.' });
+  }
+}
+
+async function handleListLooks(req, res) {
+  if (!requireSupabaseEnv(res)) return;
+  try {
+    var supabase = getSupabaseAdmin();
+    var result = await supabase
+      .from('site_looks')
+      .select('id, image_path, caption')
+      .order('sort_order', { ascending: true })
+      .order('created_at', { ascending: false });
+    if (result.error) throw result.error;
+
+    var looks = result.data.map(function (row) {
+      var publicUrl = supabase.storage.from(SITE_LOOKS_BUCKET).getPublicUrl(row.image_path).data.publicUrl;
+      return { id: row.id, caption: row.caption, imageUrl: publicUrl };
+    });
+    res.status(200).json({ looks: looks });
+  } catch (err) {
+    console.error('reviews list-looks error:', err);
+    res.status(500).json({ error: 'Не получилось загрузить образы.' });
   }
 }
 

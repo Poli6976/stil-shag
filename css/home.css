@@ -197,6 +197,12 @@ html, body {
   max-width: 34ch;
 }
 
+.hero-subtitle--explain {
+  font-size: clamp(0.85rem, 1.8vw, 1.05rem);
+  opacity: 0.8;
+  max-width: 38ch;
+}
+
 .reveal-text__inner {
   font-family: var(--font-display);
   font-style: italic;

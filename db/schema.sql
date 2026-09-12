@@ -834,3 +834,36 @@ create index if not exists reviews_status_created_idx
 alter table public.reviews enable row level security;
 -- Ни одной policy — ни pending, ни approved не читаются и не пишутся
 -- напрямую из браузера, только через service_role в api/reviews.js.
+
+-- ---------------------------------------------------------------------------
+-- 2026-09-12: примеры готовых образов (блок «Примеры готовых образов» на
+-- how-it-works.html). Управляет владелец сайта через admin-looks.html
+-- (api/admin.js, action=list-site-looks/add-site-look/delete-site-look).
+-- Тот же принцип, что у reviews выше — RLS включён, но ни одной policy: даже
+-- публичный список (api/reviews.js, action=list-looks) отдаётся
+-- service-role ключом с сервера, а не прямым запросом к таблице с anon-ключа.
+-- ---------------------------------------------------------------------------
+
+create table if not exists public.site_looks (
+  id          uuid primary key default gen_random_uuid(),
+  image_path  text not null,
+  caption     text not null,
+  sort_order  integer not null default 0,
+  created_at  timestamptz not null default now()
+);
+
+create index if not exists site_looks_sort_idx
+  on public.site_looks (sort_order, created_at desc);
+
+alter table public.site_looks enable row level security;
+-- Ни одной policy — читается и пишется только service-role ключом
+-- в api/admin.js и api/reviews.js.
+
+-- Публичный бакет, как avatars выше (не приватный looks с результатами
+-- примерок конкретных клиенток) — эти картинки и так публичные, простая
+-- постоянная ссылка без подписанных URL. Запись/удаление — только
+-- service-role ключом из api/admin.js, публичной storage-policy на
+-- insert/delete нет.
+insert into storage.buckets (id, name, public)
+values ('site-looks', 'site-looks', true)
+on conflict (id) do nothing;

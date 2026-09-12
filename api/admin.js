@@ -26,12 +26,22 @@
      POST body {action:'generate-code', adminKey, partnerId, count, note}
        — выдать партнёру пачку кодов скидки программы «Примерка» (по умолчанию
        1, максимум 50 за раз)
+     GET  query {action:'list-site-looks'} + заголовок X-Admin-Key
+       — список примеров образов для admin-looks.html (публичный список для
+       how-it-works.html отдаёт отдельно api/reviews.js, action=list-looks)
+     POST body {action:'add-site-look', adminKey, image, caption}
+       — добавить пример образа: image — data URL (base64 JPEG), заливается
+       в бакет site-looks, caption — подпись под картинкой
+     POST body {action:'delete-site-look', adminKey, id}
+       — удалить пример образа насовсем (файл из бакета + запись)
    ============================================================================ */
 
 const crypto = require('crypto');
 const { checkAdminKey } = require('../lib/adminAuth');
 const { generateCode, sanitizeRef } = require('../lib/partnerCode');
 const { getSupabaseAdmin } = require('../lib/supabaseAdmin');
+
+const SITE_LOOKS_BUCKET = 'site-looks';
 
 module.exports = async function handler(req, res) {
   var action = (req.query && req.query.action) || (req.body && req.body.action);
@@ -50,6 +60,15 @@ module.exports = async function handler(req, res) {
   }
   if (req.method === 'POST' && action === 'generate-code') {
     return handleGenerateCode(req, res);
+  }
+  if (req.method === 'GET' && action === 'list-site-looks') {
+    return handleListSiteLooks(req, res);
+  }
+  if (req.method === 'POST' && action === 'add-site-look') {
+    return handleAddSiteLook(req, res);
+  }
+  if (req.method === 'POST' && action === 'delete-site-look') {
+    return handleDeleteSiteLook(req, res);
   }
   res.status(400).json({ error: 'Неизвестное действие.' });
 };
@@ -219,5 +238,115 @@ async function handleGenerateCode(req, res) {
   } catch (err) {
     console.error('admin generate-code error:', err);
     res.status(500).json({ error: 'Не получилось выдать коды.' });
+  }
+}
+
+async function handleListSiteLooks(req, res) {
+  if (!checkAdminKey(req.headers && req.headers['x-admin-key'])) {
+    res.status(401).json({ error: 'Неверный админ-ключ.' });
+    return;
+  }
+  if (!requireSupabaseEnv(res)) return;
+
+  try {
+    var supabase = getSupabaseAdmin();
+    var result = await supabase
+      .from('site_looks')
+      .select('id, image_path, caption, sort_order, created_at')
+      .order('sort_order', { ascending: true })
+      .order('created_at', { ascending: false });
+    if (result.error) throw result.error;
+
+    var looks = result.data.map(function (row) {
+      var publicUrl = supabase.storage.from(SITE_LOOKS_BUCKET).getPublicUrl(row.image_path).data.publicUrl;
+      return { id: row.id, caption: row.caption, sortOrder: row.sort_order, createdAt: row.created_at, imageUrl: publicUrl };
+    });
+    res.status(200).json({ looks: looks });
+  } catch (err) {
+    console.error('admin list-site-looks error:', err);
+    res.status(500).json({ error: 'Не получилось загрузить образы.' });
+  }
+}
+
+async function handleAddSiteLook(req, res) {
+  if (!checkAdminKey(req.body && req.body.adminKey)) {
+    res.status(401).json({ error: 'Неверный админ-ключ.' });
+    return;
+  }
+  if (!requireSupabaseEnv(res)) return;
+
+  var caption = String((req.body && req.body.caption) || '').trim().slice(0, 300);
+  if (!caption) {
+    res.status(400).json({ error: 'Добавьте подпись к образу.' });
+    return;
+  }
+  var image = req.body && req.body.image;
+  var match = typeof image === 'string' && image.match(/^data:image\/(jpeg|jpg|png);base64,(.+)$/);
+  if (!match) {
+    res.status(400).json({ error: 'Не получилось прочитать картинку — загрузите фото ещё раз.' });
+    return;
+  }
+  var buffer = Buffer.from(match[2], 'base64');
+  if (buffer.length > 6 * 1024 * 1024) {
+    res.status(400).json({ error: 'Файл слишком большой.' });
+    return;
+  }
+
+  try {
+    var supabase = getSupabaseAdmin();
+    var path = crypto.randomUUID() + '.jpg';
+
+    var uploadResult = await supabase.storage.from(SITE_LOOKS_BUCKET).upload(path, buffer, {
+      contentType: 'image/jpeg',
+      upsert: false
+    });
+    if (uploadResult.error) throw uploadResult.error;
+
+    var insertResult = await supabase
+      .from('site_looks')
+      .insert({ image_path: path, caption: caption })
+      .select('id')
+      .single();
+    if (insertResult.error) throw insertResult.error;
+
+    res.status(200).json({ ok: true, id: insertResult.data.id });
+  } catch (err) {
+    console.error('admin add-site-look error:', err);
+    res.status(500).json({ error: 'Не получилось добавить образ.' });
+  }
+}
+
+async function handleDeleteSiteLook(req, res) {
+  if (!checkAdminKey(req.body && req.body.adminKey)) {
+    res.status(401).json({ error: 'Неверный админ-ключ.' });
+    return;
+  }
+  if (!requireSupabaseEnv(res)) return;
+
+  var id = req.body && req.body.id;
+  if (!id) {
+    res.status(400).json({ error: 'Не хватает id.' });
+    return;
+  }
+
+  try {
+    var supabase = getSupabaseAdmin();
+    var selectResult = await supabase.from('site_looks').select('image_path').eq('id', id).maybeSingle();
+    if (selectResult.error) throw selectResult.error;
+    if (!selectResult.data) {
+      res.status(404).json({ error: 'Образ не найден.' });
+      return;
+    }
+
+    var removeResult = await supabase.storage.from(SITE_LOOKS_BUCKET).remove([selectResult.data.image_path]);
+    if (removeResult.error) console.error('admin delete-site-look: не удалось удалить файл:', removeResult.error);
+
+    var deleteResult = await supabase.from('site_looks').delete().eq('id', id);
+    if (deleteResult.error) throw deleteResult.error;
+
+    res.status(200).json({ ok: true });
+  } catch (err) {
+    console.error('admin delete-site-look error:', err);
+    res.status(500).json({ error: 'Не получилось удалить образ.' });
   }
 }

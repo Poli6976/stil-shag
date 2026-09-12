@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="ru" data-theme="light">
+<head>
+<meta charset="utf-8">
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Примеры образов — служебная страница</title>
+<meta name="robots" content="noindex, nofollow">
+
+<link rel="stylesheet" href="css/tokens.css?v=7">
+<link rel="stylesheet" href="css/base.css?v=2">
+<link rel="stylesheet" href="css/components/button-3d.css?v=3">
+<link rel="stylesheet" href="css/cabinet.css?v=2">
+<style>
+  body { padding: 24px; display: flex; justify-content: center; }
+  .admin-wrap { max-width: 760px; width: 100%; }
+  .admin-card { padding: 28px 32px; border-radius: 18px; background: rgba(255,255,255,.55); border: 1px solid var(--glow-silver); margin: 0 0 24px; }
+  .admin-card h1 { font-family: var(--font-display); font-size: 1.5rem; font-weight: 500; margin: 0 0 8px; }
+  .admin-card p { font-family: var(--font-body); color: var(--text-muted); font-size: .92rem; line-height: 1.6; margin: 0 0 18px; }
+  .admin-field { margin-bottom: 14px; }
+  .admin-field label { display: block; font-family: var(--font-body); font-size: .82rem; color: var(--text-muted); margin-bottom: 6px; }
+  .admin-field input, .admin-field textarea { width: 100%; box-sizing: border-box; padding: 12px 16px; border-radius: 12px; border: 1px solid var(--glow-silver); background: rgba(255,255,255,.6); font-family: var(--font-body); font-size: .96rem; color: var(--text-primary); }
+  .admin-field textarea { resize: vertical; min-height: 70px; }
+  .admin-msg { margin-top: 14px; font-family: var(--font-body); font-size: .92rem; color: var(--text-muted); }
+  .admin-msg.is-error { color: #b23b3b; }
+  .admin-card .btn-3d { margin-top: 4px; }
+
+  .look-item { display: flex; gap: 16px; padding: 16px; border-radius: 14px; background: rgba(255,255,255,.6); border: 1px solid var(--glow-silver); margin-bottom: 14px; align-items: center; }
+  .look-item img { width: 90px; height: 120px; object-fit: cover; border-radius: 10px; flex-shrink: 0; }
+  .look-item .look-item__body { flex: 1; min-width: 0; }
+  .look-item p { font-family: var(--font-body); font-size: .92rem; line-height: 1.5; color: var(--text-primary); margin: 0 0 10px; }
+  .look-item .btn-3d { padding: 8px 18px; font-size: .8rem; }
+  .look-empty { font-family: var(--font-body); font-style: italic; color: var(--text-faint); }
+</style>
+</head>
+<body>
+
+<div class="admin-wrap">
+
+  <div class="admin-card">
+    <h1>Примеры образов</h1>
+    <p>
+      Служебная страница, не для покупательниц — не ссылается ниоткуда на сайте. Здесь можно
+      добавить или удалить образы из блока «Примеры готовых образов» на странице «Как это работает».
+    </p>
+    <div class="admin-field">
+      <label for="adminKey">Админ-ключ</label>
+      <input type="password" id="adminKey" autocomplete="current-password">
+    </div>
+    <button type="button" id="loadBtn" class="btn-3d btn-3d--rect">Показать образы</button>
+    <div class="admin-msg" id="topMsg" style="display:none"></div>
+  </div>
+
+  <div class="admin-card" id="addCard" style="display:none">
+    <h1>Добавить образ</h1>
+    <form id="addForm">
+      <div class="admin-field">
+        <label for="addCaption">Подпись под картинкой</label>
+        <textarea id="addCaption" maxlength="300" placeholder="Например: Уже есть: бежевая рубашка. Плюс: тёмно-синие брюки, жакет, лодочки." required></textarea>
+      </div>
+      <div class="admin-field">
+        <label for="addImage">Файл (JPEG или PNG)</label>
+        <input type="file" id="addImage" accept="image/*" required>
+      </div>
+      <button type="submit" class="btn-3d btn-3d--rect">Добавить</button>
+    </form>
+    <div class="admin-msg" id="addMsg" style="display:none"></div>
+  </div>
+
+  <div class="admin-card" id="looksCard" style="display:none">
+    <h1>Сейчас на сайте</h1>
+    <div id="looksList"></div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var adminKeyInput = document.getElementById('adminKey');
+  var loadBtn = document.getElementById('loadBtn');
+  var topMsg = document.getElementById('topMsg');
+  var addCard = document.getElementById('addCard');
+  var addForm = document.getElementById('addForm');
+  var addCaption = document.getElementById('addCaption');
+  var addImage = document.getElementById('addImage');
+  var addMsg = document.getElementById('addMsg');
+  var looksCard = document.getElementById('looksCard');
+  var looksList = document.getElementById('looksList');
+
+  function showMsg(el, text, isError) {
+    el.style.display = text ? 'block' : 'none';
+    el.textContent = text || '';
+    el.className = 'admin-msg' + (isError ? ' is-error' : '');
+  }
+
+  function adminKey() {
+    return adminKeyInput.value;
+  }
+
+  /* та же логика сжатия фото, что в js/wizard.js и js/look-builder.js — без
+     нее даже обычное фото с телефона легко превышает лимит тела запроса */
+  function resizeImageFile(file, maxDim) {
+    return new Promise(function (resolve, reject) {
+      var reader = new FileReader();
+      reader.onerror = function () { reject(new Error('Не удалось прочитать файл.')); };
+      reader.onload = function () {
+        var img = new Image();
+        img.onerror = function () { reject(new Error('Не удалось открыть изображение.')); };
+        img.onload = function () {
+          var scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+          var w = Math.max(1, Math.round(img.width * scale));
+          var h = Math.max(1, Math.round(img.height * scale));
+          var canvas = document.createElement('canvas');
+          canvas.width = w;
+          canvas.height = h;
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+          resolve(canvas.toDataURL('image/jpeg', 0.85));
+        };
+        img.src = reader.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function loadLooks() {
+    if (!adminKey()) {
+      showMsg(topMsg, 'Введите админ-ключ.', true);
+      return;
+    }
+    showMsg(topMsg, 'Загружаю…');
+    loadBtn.setAttribute('disabled', '');
+
+    fetch('api/admin?action=list-site-looks', { headers: { 'X-Admin-Key': adminKey() } })
+      .then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); })
+      .then(function (r) {
+        if (!r.ok) throw new Error(r.data.error || 'Не получилось загрузить образы.');
+        showMsg(topMsg, '');
+        addCard.style.display = 'block';
+        looksCard.style.display = 'block';
+        renderLooks(r.data.looks);
+      })
+      .catch(function (err) {
+        showMsg(topMsg, err.message, true);
+      })
+      .then(function () {
+        loadBtn.removeAttribute('disabled');
+      });
+  }
+
+  function renderLooks(looks) {
+    looksList.innerHTML = '';
+
+    if (!looks.length) {
+      var empty = document.createElement('p');
+      empty.className = 'look-empty';
+      empty.textContent = 'Образов пока нет.';
+      looksList.appendChild(empty);
+      return;
+    }
+
+    looks.forEach(function (look) {
+      var item = document.createElement('div');
+      item.className = 'look-item';
+
+      var img = document.createElement('img');
+      img.src = look.imageUrl;
+      img.alt = '';
+      item.appendChild(img);
+
+      var body = document.createElement('div');
+      body.className = 'look-item__body';
+
+      var text = document.createElement('p');
+      text.textContent = look.caption;
+      body.appendChild(text);
+
+      var deleteBtn = document.createElement('button');
+      deleteBtn.type = 'button';
+      deleteBtn.className = 'btn-3d btn-3d--rect';
+      deleteBtn.textContent = 'Удалить';
+      deleteBtn.addEventListener('click', function () {
+        if (!window.confirm('Удалить этот образ с сайта безвозвратно?')) return;
+        deleteLook(look.id, item, deleteBtn);
+      });
+      body.appendChild(deleteBtn);
+
+      item.appendChild(body);
+      looksList.appendChild(item);
+    });
+  }
+
+  function deleteLook(id, item, button) {
+    button.setAttribute('disabled', '');
+
+    fetch('api/admin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'delete-site-look', adminKey: adminKey(), id: id })
+    })
+      .then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); })
+      .then(function (r) {
+        if (!r.ok) throw new Error(r.data.error || 'Не получилось удалить образ.');
+        item.remove();
+        if (!looksList.children.length) {
+          var empty = document.createElement('p');
+          empty.className = 'look-empty';
+          empty.textContent = 'Образов пока нет.';
+          looksList.appendChild(empty);
+        }
+      })
+      .catch(function (err) {
+        window.alert(err.message);
+        button.removeAttribute('disabled');
+      });
+  }
+
+  addForm.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var file = addImage.files && addImage.files[0];
+    if (!file) return;
+    if (!/^image\//.test(file.type)) {
+      showMsg(addMsg, 'Это не похоже на картинку — выберите фото.', true);
+      return;
+    }
+
+    var submitBtn = addForm.querySelector('button[type="submit"]');
+    submitBtn.setAttribute('disabled', '');
+    showMsg(addMsg, 'Обрабатываю фото…');
+
+    resizeImageFile(file, 1024)
+      .then(function (dataUrl) {
+        showMsg(addMsg, 'Загружаю…');
+        return fetch('api/admin', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'add-site-look',
+            adminKey: adminKey(),
+            image: dataUrl,
+            caption: addCaption.value.trim()
+          })
+        });
+      })
+      .then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); })
+      .then(function (r) {
+        if (!r.ok) throw new Error(r.data.error || 'Не получилось добавить образ.');
+        showMsg(addMsg, 'Готово — образ добавлен.');
+        addForm.reset();
+        loadLooks();
+      })
+      .catch(function (err) {
+        showMsg(addMsg, err.message, true);
+      })
+      .then(function () {
+        submitBtn.removeAttribute('disabled');
+      });
+  });
+
+  loadBtn.addEventListener('click', loadLooks);
+})();
+</script>
+
+</body>
+</html>

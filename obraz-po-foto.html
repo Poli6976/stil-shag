@@ -4,16 +4,16 @@
 <meta charset="utf-8">
 <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Образ по фото — референс от ИИ-стилиста — Стиль</title>
+<title>Образ по фото — анкета и фото вещи — Стиль</title>
 <link rel="canonical" href="https://www.stil-shag.ru/obraz-po-foto.html">
-<meta name="description" content="Загрузите фото вещи на человеке — платье, жакете, брюках — и получите референс-иллюстрацию образа вокруг неё от ИИ-стилиста. Не примерка и не ваша фотография в образе.">
+<meta name="description" content="Опишите вещь и покажите её фото — на плечиках, манекене, столе или кровати, без примерки — ответьте на пару вопросов и получите образ по слоям с объяснением, почему именно так.">
 <meta property="og:type" content="website">
-<meta property="og:title" content="Образ по фото — референс от ИИ-стилиста — Стиль">
-<meta property="og:description" content="Загрузите фото вещи на человеке — получите референс-иллюстрацию образа вокруг неё. Не примерка.">
+<meta property="og:title" content="Образ по фото — анкета и фото вещи — Стиль">
+<meta property="og:description" content="Покажите фото вещи — на плечиках, манекене или столе — ответьте на пару вопросов и получите образ по слоям.">
 <meta property="og:image" content="assets/WKnaQxw-vzS6oO1OZq5uZ_5R9gOm7j.webp">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Образ по фото — референс от ИИ-стилиста — Стиль">
-<meta name="twitter:description" content="Загрузите фото вещи на человеке — получите референс-иллюстрацию образа вокруг неё. Не примерка.">
+<meta name="twitter:title" content="Образ по фото — анкета и фото вещи — Стиль">
+<meta name="twitter:description" content="Покажите фото вещи — на плечиках, манекене или столе — ответьте на пару вопросов и получите образ по слоям.">
 <meta name="twitter:image" content="assets/WKnaQxw-vzS6oO1OZq5uZ_5R9gOm7j.webp">
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -25,7 +25,6 @@
 <link rel="stylesheet" href="css/components/button-3d.css?v=3">
 <link rel="stylesheet" href="css/inner.css?v=28">
 <link rel="stylesheet" href="css/wizard.css?v=5">
-<link rel="stylesheet" href="css/look-builder.css?v=2">
 </head>
 <body>
 
@@ -35,8 +34,8 @@
     <button type="button" class="page-header__toggle" aria-expanded="false" aria-controls="page-nav">Меню</button>
     <nav class="page-header__nav" id="page-nav">
       <a href="how-it-works.html">Как это работает</a>
-      <a href="online-stylist.html">Онлайн-стилист</a>
       <a href="obraz-po-foto.html">Образ по фото</a>
+      <a href="online-stylist.html">Онлайн-стилист</a>
       <a href="primerka.html">Примерка</a>
       <a href="prices.html">Цены</a>
       <a href="faq.html">FAQ</a>
@@ -47,21 +46,26 @@
 
 <main>
   <section class="page-hero page-hero--tight">
-    <span class="page-hero__eyebrow">Образ по фото · референс, не примерка · пробный запуск</span>
-    <h1>Покажите вещь — получите референс образа вокруг неё</h1>
+    <span class="page-hero__eyebrow">Образ по фото · анкета + фото вещи · пробный формат</span>
+    <h1>Соберите образ по фото вещи — без примерки</h1>
     <p class="page-hero__lead">
-      Загрузите фото, где вещь надета на человеке — платье, жакете, брюках — и ИИ-стилист распишет
-      полный образ по слоям и нарисует референс: иллюстрацию того, как он может выглядеть. Это не
-      примерка и не фотография именно вас в готовом образе — а художественный набросок на условной
-      модели, который показывает логику образа. Уже настоящий подбор под вашу вещь, не заготовленный
-      шаблон.
+      Пара вопросов по одному за раз — плюс фото самой вещи: на плечиках, манекене, столе или
+      кровати, без человека — и вы получите образ по слоям с объяснением, почему именно так.
+      Цена уточняется.
     </p>
     <p class="discount-hint">Есть код от партнёра? <a href="cabinet.html#partnerCodeSection">Введите его сначала →</a> — тогда скидка 50% учтётся автоматически.</p>
   </section>
-
   <div class="wizard-shell">
-    <div id="lbAuthGate"></div>
-    <div class="lb-shell" id="lookBuilder"></div>
+    <div id="wizardAuthGate"></div>
+    <div class="wizard-progress" id="wizardProgressWrap" style="display:none">
+      <span class="wizard-progress__label" id="wizardProgressLabel">Шаг 1 из 7</span>
+      <div class="wizard-progress__bar"><div class="wizard-progress__fill" id="wizardProgressFill"></div></div>
+    </div>
+    <div class="wizard-step" id="wizardStep"></div>
+    <noscript>
+      <p class="wizard-step__hint">Анкета «Образ по фото» — пошаговый подбор образа по слоям вокруг вашей вещи, цена уточняется.
+        Она работает на JavaScript — включите его в браузере, чтобы пройти анкету.</p>
+    </noscript>
   </div>
 </main>
 
@@ -70,8 +74,8 @@
     <div class="site-footer__col">
       <h4>Продукт</h4>
       <a href="how-it-works.html">Как это работает</a>
-      <a href="online-stylist.html">Онлайн-стилист</a>
       <a href="obraz-po-foto.html">Образ по фото</a>
+      <a href="online-stylist.html">Онлайн-стилист</a>
       <a href="primerka.html">Программа «Примерка»</a>
       <a href="prices.html">Цены</a>
       <a href="cabinet.html">Личный кабинет</a>
@@ -99,7 +103,7 @@
 
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 <script src="js/auth-gate.js"></script>
-<script src="js/look-builder.js"></script>
+<script src="js/wizard.js"></script>
 <script src="js/nav-active.js"></script>
 <script src="js/nav-toggle.js"></script>
 </body>

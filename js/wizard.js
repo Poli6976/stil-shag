@@ -468,7 +468,7 @@
       root.appendChild(itemField);
 
       var photoField = el('div', 'wizard-field');
-      photoField.appendChild(el('label', null, 'Фото вещи (необязательно)'));
+      photoField.appendChild(el('label', null, 'Фото вещи'));
 
       var photoConsentWrap = el('label', 'wizard-consent');
       var photoConsentCheckbox = document.createElement('input');

@@ -1,4 +1,5 @@
 User-agent: *
 Allow: /
+Disallow: /structure.html
 
 Sitemap: https://www.stil-shag.ru/sitemap.xml

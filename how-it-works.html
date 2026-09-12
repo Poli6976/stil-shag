@@ -33,8 +33,8 @@
     <button type="button" class="page-header__toggle" aria-expanded="false" aria-controls="page-nav">Меню</button>
     <nav class="page-header__nav" id="page-nav">
       <a href="how-it-works.html">Как это работает</a>
-      <a href="online-stylist.html">Онлайн-стилист</a>
       <a href="obraz-po-foto.html">Образ по фото</a>
+      <a href="online-stylist.html">Онлайн-стилист</a>
       <a href="primerka.html">Примерка</a>
       <a href="prices.html">Цены</a>
       <a href="faq.html">FAQ</a>
@@ -79,22 +79,22 @@
       <li class="step-card">
         <span class="step-card__num">1</span>
         <div>
-          <h3>Покажите вещь</h3>
-          <p>Ту, что уже приглянулась или лежит в шкафу — фото или пара слов, этого достаточно, чтобы начать.</p>
+          <h3>Сфотографируйте вещь на себе</h3>
+          <p>Наденьте ту вещь, вокруг которой хотите собрать образ, и загрузите фото — так ИИ-стилист увидит, как она сидит и сочетается с вами.</p>
         </div>
       </li>
       <li class="step-card">
         <span class="step-card__num">2</span>
         <div>
-          <h3>Ответьте на пару вопросов</h3>
-          <p>О стиле жизни, привычках, что уже есть в гардеробе — по одному вопросу за раз, без длинных анкет.</p>
+          <h3>Уточните рост и размер</h3>
+          <p>По желанию — поможет точнее подобрать посадку и длину остальных вещей в образе.</p>
         </div>
       </li>
       <li class="step-card">
         <span class="step-card__num">3</span>
         <div>
-          <h3>Получите готовый образ</h3>
-          <p>Обувь, аксессуары, причёска, макияж — и объяснение, почему именно так.</p>
+          <h3>Получите референс образа</h3>
+          <p>Обувь, аксессуары, причёска, макияж — и нарисованная иллюстрация с объяснением, почему именно так.</p>
         </div>
       </li>
       <li class="step-card step-card--highlight">
@@ -106,6 +106,17 @@
         </div>
       </li>
     </ol>
+  </section>
+
+  <!-- ================= ПРИМЕРЫ ОБРАЗОВ ================= -->
+  <section class="page-section" id="looksSection" style="display:none">
+    <h2 class="page-section__title">Примеры готовых образов</h2>
+    <p class="section-note">
+      Реальные результаты алгоритма — каждый образ строится вокруг одной вещи, которая уже есть.
+      Подбирает их автоматический алгоритм, без участия стилиста вручную по каждому заказу
+      (подробнее — в <a href="faq.html">FAQ</a>).
+    </p>
+    <div class="looks-grid" id="looksGrid"></div>
   </section>
 
   <!-- ================= МИНИ-FAQ ================= -->
@@ -148,7 +159,6 @@
 
   <div class="page-cta-notes">
     <p class="discount-hint">Уже есть код от партнёра? <a href="cabinet.html#partnerCodeSection">Введите его сначала →</a> — тогда скидка 50% учтётся автоматически.</p>
-    <a href="https://t.me/stil_tvoy_shag" target="_blank" rel="noopener" class="btn-outline">Подписаться на Telegram-канал</a>
   </div>
 
   <section class="page-cta">
@@ -162,8 +172,8 @@
     <div class="site-footer__col">
       <h4>Продукт</h4>
       <a href="how-it-works.html">Как это работает</a>
-      <a href="online-stylist.html">Онлайн-стилист</a>
       <a href="obraz-po-foto.html">Образ по фото</a>
+      <a href="online-stylist.html">Онлайн-стилист</a>
       <a href="primerka.html">Программа «Примерка»</a>
       <a href="prices.html">Цены</a>
       <a href="cabinet.html">Личный кабинет</a>
@@ -190,6 +200,7 @@
 </footer>
 
 <script src="js/reviews.js"></script>
+<script src="js/looks-gallery.js"></script>
 <script src="js/nav-active.js"></script>
 <script src="js/nav-toggle.js"></script>
 </body>
