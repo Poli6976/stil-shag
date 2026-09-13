@@ -1,8 +1,10 @@
-/* ============ Онлайн-стилист: визард 3.1 (быстрый старт) + 3.2 (анкета) + 3.3/3.4 (демо-результат) ============
-   Реального ИИ-стилиста пока нет — сайт статический, без бэкенда. Финальный экран честно
-   показывает пример формата (подобранный по поводу/возрасту из ответов), а не выдаёт его
-   за персональную генерацию. Подключение настоящей языковой модели — отдельный этап,
-   когда определимся с бэкендом (см. раздел 6 структуры сайта). */
+/* ============ «Образ по фото» (obraz-po-foto.html): анкета + фото вещи, 299 ₽ ============
+   Слои повода (Низ/Обувь/Аксессуары/...) — статичные шаблоны по поводу и возрасту из
+   ответов, без вызова языковой модели (это и держит цену низкой). Слой «Верх» —
+   исключение: реальное описание вещи с фото пользователя, полученное через GigaChat на
+   предыдущем шаге (api/analyze-item.js) и подставленное сюда через applyItemToLayers.
+   Результат текстовый, без иллюстрации — рисованный референс образа собирает отдельный,
+   более дорогой продукт («Онлайн-стилист», api/compose-look.js). */
 
 (function () {
   var STEPS = [
@@ -363,12 +365,12 @@
     return { tpl: tpl, layers: layers, isMale: isMale };
   }
 
-  /* Списывает право на образ (бесплатный образ из пунш-карты / скидка по
-     коду / полная цена — см. lib/lookAccess.js) и только при успехе
-     показывает результат. Слои
-     считаются заранее из статичных шаблонов (бесплатно для нас) и уходят на
-     сервер вместе со списанием — там по ним пробуют нарисовать картинку
-     через YandexART (api/looks/charge.js), необязательный бонус к тексту. */
+  /* Списывает фиксированную цену «Образа по фото» (299 ₽, без пунш-карты и
+     без кодов партнёра — см. chargeForObrazPoFoto в lib/lookAccess.js) и
+     только при успехе показывает результат. Слои считаются заранее из
+     статичных шаблонов (бесплатно для нас) и уходят на сервер вместе со
+     списанием — там только сохраняются в «Мои образы» текстом, без картинки
+     (api/looks/charge.js). */
   function chargeAndRenderResult() {
     root.innerHTML = '';
     root.appendChild(el('p', 'wizard-step__hint', 'Оформляем ваш образ…'));
@@ -398,13 +400,13 @@
         }
         return res.json();
       })
-      .then(function (data) {
-        renderResult(built, data.image);
+      .then(function () {
+        renderResult(built);
       })
       .catch(function (err) {
         root.innerHTML = '';
         root.appendChild(el('span', 'wizard-result__badge', err.status === 402 ? 'Нужна оплата' : 'Ошибка'));
-        root.appendChild(el('h2', null, err.status === 402 ? 'Первый образ уже использован' : 'Не получилось'));
+        root.appendChild(el('h2', null, err.status === 402 ? 'Недостаточно средств на балансе' : 'Не получилось'));
         root.appendChild(el('p', 'wizard-result__note', (err && err.message) || 'Попробуйте ещё раз.'));
         var link = el('a', 'btn-3d btn-3d--rect', 'Пополнить баланс в кабинете');
         link.href = 'cabinet.html';
@@ -691,7 +693,7 @@
     } catch (e) {}
   }
 
-  function renderResult(built, image) {
+  function renderResult(built) {
     bumpStyleCount();
 
     progressLabel.textContent = 'Готово';
@@ -701,26 +703,15 @@
 
     var tpl = built.tpl;
     var layers = built.layers;
-    root.appendChild(el('span', 'wizard-result__badge', 'Пример формата, не персональная генерация'));
+    root.appendChild(el('span', 'wizard-result__badge', 'Собрано алгоритмом по вашим ответам и фото вещи'));
     root.appendChild(el('h2', null, 'Ваш образ по слоям'));
 
     var itemNote = answers.item ? 'Вещь: «' + escapeHtml(answers.item) + '». ' : '';
     root.appendChild(el('p', 'wizard-result__note',
-      itemNote + 'Так выглядит формат результата для повода «' + tpl.title.toLowerCase() + '». ' +
-      'Настоящий ИИ-стилист, который будет собирать образ именно под вашу вещь и ответы, — следующий этап: ' +
-      'сайту нужен бэкенд с подключением к языковой модели, сейчас это чистая статика.'
+      itemNote + 'Слой «Верх» — ваша вещь с фото, остальные слои алгоритм подобрал под повод «' +
+      tpl.title.toLowerCase() + '» и ваши ответы. Без иллюстрации: рисованный референс образа — ' +
+      'на «Онлайн-стилисте», отдельным продуктом.'
     ));
-
-    if (image) {
-      root.appendChild(el('p', 'wizard-result__note',
-        'Картинка ниже — иллюстрация по описанию выше, нарисованная ИИ с нуля, а не фотография реальной вещи или человека.'
-      ));
-      var img = document.createElement('img');
-      img.className = 'wizard-result-image';
-      img.src = image;
-      img.alt = 'Иллюстрация образа';
-      root.appendChild(img);
-    }
 
     var layersBlock = el('div', 'wizard-result__block');
     layersBlock.appendChild(el('div', 'wizard-result__block-title', '👕 Образ по слоям'));

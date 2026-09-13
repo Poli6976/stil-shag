@@ -867,3 +867,58 @@ alter table public.site_looks enable row level security;
 insert into storage.buckets (id, name, public)
 values ('site-looks', 'site-looks', true)
 on conflict (id) do nothing;
+
+-- ---------------------------------------------------------------------------
+-- 2026-09-13: «Образ по фото» стал отдельным дешёвым продуктом (299 ₽, без
+-- картинки — см. api/looks/charge.js), а не урезанной «Примеркой». Ему нужно
+-- своё списание, которое НЕ трогает пунш-карту бесплатных образов:
+-- debit_wallet_for_package выше (строки ~721+) при любом успешном списании
+-- начисляет +2 free_credits_remaining — это верно для полной цены «Примерки»
+-- (998 ₽), но было бы явной ошибкой для 299 ₽: тот же бонус в 3+ раза дешевле.
+-- debit_wallet_flat — копия САМОЙ ПЕРВОЙ версии debit_wallet_for_package
+-- (до того, как в неё добавили бонус) — просто списывает баланс и пишет
+-- транзакцию/заказ, без всякой пунш-карты. Код партнёра (discount_credits)
+-- сюда тоже не подключаем — скидка 50% остаётся только у «Примерки».
+-- ---------------------------------------------------------------------------
+
+create or replace function public.debit_wallet_flat(
+  p_user_id uuid,
+  p_package_code text,
+  p_price_kopecks bigint
+)
+returns table (order_id uuid, new_balance bigint)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_new_balance bigint;
+  v_tx_id uuid;
+  v_order_id uuid;
+begin
+  update public.wallets
+    set balance_kopecks = balance_kopecks - p_price_kopecks, updated_at = now()
+    where user_id = p_user_id and balance_kopecks >= p_price_kopecks
+    returning balance_kopecks into v_new_balance;
+
+  if not found then
+    raise exception 'insufficient_funds' using errcode = 'P0001';
+  end if;
+
+  insert into public.wallet_transactions
+    (user_id, type, amount_kopecks, balance_after_kopecks, metadata)
+    values (p_user_id, 'debit', p_price_kopecks, v_new_balance, jsonb_build_object('package_code', p_package_code))
+    returning id into v_tx_id;
+
+  insert into public.orders (user_id, package_code, price_kopecks, wallet_transaction_id)
+    values (p_user_id, p_package_code, p_price_kopecks, v_tx_id)
+    returning id into v_order_id;
+
+  update public.wallet_transactions set order_id = v_order_id where id = v_tx_id;
+
+  return query select v_order_id, v_new_balance;
+end;
+$$;
+
+revoke execute on function public.debit_wallet_flat(uuid, text, bigint) from public;
+grant execute on function public.debit_wallet_flat(uuid, text, bigint) to service_role;

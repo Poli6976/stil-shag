@@ -1,40 +1,27 @@
 /* ============================================================================
    POST /api/looks/charge — списать право на один "образ" у визарда
-   (online-stylist.html) и, если получится, нарисовать картинку по уже
-   готовому тексту образа (слои считает клиент из статичных шаблонов
-   js/wizard.js — сюда приходит готовый результат, GigaChat не нужен, он
-   только ОПИСЫВАЕТ фото, а тут и так уже есть текст).
+   (obraz-po-foto.html) — слои считает клиент из статичных шаблонов
+   js/wizard.js, сюда приходит готовый текст образа, GigaChat не нужен, он
+   только ОПИСЫВАЕТ вещь на предыдущем шаге (api/analyze-item.js), а тут
+   всё уже есть.
 
-   Картинка — best-effort: если ключи YandexART не настроены или генерация
-   не удалась, всё равно списываем право и отдаём текстовый результат — как
-   было раньше, до этой картинки. Не должны ронять уже рабочий текстовый
-   визард из-за необязательного бонуса.
-
-   По бизнес-правилу каждый 3-й образ на сайте бесплатен (бессрочный цикл
-   «1 бесплатно — 2 платно»), остальные — платно/по коду партнёра — одинаково
-   для визарда и "Образа по фото"
-   (см. lib/lookAccess.js). Проверка платёжеспособности — ДО генерации
-   картинки, чтобы не тратить деньги на YandexART для того, кому нечем
-   платить. Само списание — ПОСЛЕ попытки генерации, тем же принципом, что
-   в api/compose-look.js: неудачная генерация не должна съедать бесплатный
-   образ или деньги впустую (хотя тут это мягче — картинка необязательна).
+   2026-09-13 — «Образ по фото» стал отдельным дешёвым продуктом (299 ₽,
+   см. lib/packages.js) БЕЗ картинки, а не облегчённой «Примеркой»: раньше
+   этот эндпоинт по цене «Примерки» (998 ₽/499 ₽ через lib/lookAccess.js)
+   ещё и пытался нарисовать иллюстрацию через YandexART/Alice AI ART — то
+   есть тратил на дешёвый шаблонный текст ту же дорогую картинку, что и
+   полноценный разбор реального фото на "Онлайн-стилисте" (api/compose-
+   look.js), и при этом даже не показывал цену на сайте ("Цена уточняется").
+   Убрали генерацию картинки совсем — экономит основную часть себестоимости
+   и делает разницу между продуктами понятной посетительнице (дешевле =
+   без иллюстрации, не "то же самое, но случайно дешевле"). Текстовый
+   результат всё равно сохраняется в «Мои образы» (см. saveLook ниже —
+   без imageBuffer это просто текстовая карточка).
    ============================================================================ */
 
 const { requireUser } = require('../../lib/auth');
-const { previewLookEntitlement, chargeForLook } = require('../../lib/lookAccess');
-const { generateLookImage, buildLookImagePrompt } = require('../../lib/yandexart');
+const { previewObrazPoFotoEntitlement, chargeForObrazPoFoto } = require('../../lib/lookAccess');
 const { saveLook } = require('../../lib/savedLooks');
-
-async function tryGenerateImage(layers, fit, gender) {
-  if (!process.env.YANDEX_API_KEY || !process.env.YANDEX_FOLDER_ID) return null;
-  if (!layers || !Object.keys(layers).length) return null;
-  try {
-    return await generateLookImage(buildLookImagePrompt(layers, fit, null, gender));
-  } catch (err) {
-    console.error('looks/charge: не удалось сгенерировать картинку:', err);
-    return null;
-  }
-}
 
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -56,12 +43,11 @@ module.exports = async function handler(req, res) {
   var layers = (body.layers && typeof body.layers === 'object') ? body.layers : {};
   var why = typeof body.why === 'string' ? body.why.slice(0, 500) : '';
   var fit = typeof body.fit === 'string' ? body.fit.slice(0, 200) : '';
-  var gender = body.gender === 'male' ? 'male' : 'female'; // дефолт сайта, если не прислали
 
   try {
-    var entitled = await previewLookEntitlement(user.id);
+    var entitled = await previewObrazPoFotoEntitlement(user.id);
     if (!entitled) {
-      res.status(402).json({ error: 'Первый образ уже использован. Пополните баланс в личном кабинете, чтобы получить ещё один.' });
+      res.status(402).json({ error: 'Недостаточно средств на балансе. Пополните баланс в личном кабинете, чтобы собрать образ.' });
       return;
     }
   } catch (err) {
@@ -70,36 +56,26 @@ module.exports = async function handler(req, res) {
     return;
   }
 
-  var imageBase64 = await tryGenerateImage(layers, fit, gender);
-
   try {
-    var result = await chargeForLook(user.id);
+    var result = await chargeForObrazPoFoto(user.id);
 
     var savedLookId = null;
-    if (imageBase64) {
-      try {
-        var saved = await saveLook(user.id, {
-          layers: layers,
-          why: why,
-          fit: fit,
-          imageBuffer: Buffer.from(imageBase64, 'base64')
-        });
-        savedLookId = saved.id;
-      } catch (saveErr) {
-        console.error('looks/charge: не удалось сохранить образ в кабинет:', saveErr);
-      }
+    try {
+      var saved = await saveLook(user.id, { layers: layers, why: why, fit: fit });
+      savedLookId = saved.id;
+    } catch (saveErr) {
+      console.error('looks/charge: не удалось сохранить образ в кабинет:', saveErr);
     }
 
     res.status(200).json({
       method: result.method,
       orderId: result.orderId,
       balanceKopecks: result.balanceKopecks,
-      image: imageBase64 ? 'data:image/jpeg;base64,' + imageBase64 : null,
       savedLookId: savedLookId
     });
   } catch (err) {
     if (err.code === 'insufficient_funds') {
-      res.status(402).json({ error: 'Первый образ уже использован. Пополните баланс в личном кабинете, чтобы получить ещё один.' });
+      res.status(402).json({ error: 'Недостаточно средств на балансе. Пополните баланс в личном кабинете, чтобы собрать образ.' });
       return;
     }
     console.error('looks/charge error:', err);
