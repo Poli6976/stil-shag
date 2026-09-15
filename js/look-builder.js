@@ -5,12 +5,18 @@
 
 (function () {
   var LAYER_LABELS = ['Верх', 'Низ', 'Верхняя одежда', 'Обувь', 'Аксессуары', 'Причёска', 'Макияж'];
+  var OCCASIONS = [
+    { value: 'office', label: 'Офис' },
+    { value: 'walk', label: 'Прогулка' },
+    { value: 'evening', label: 'Вечер' },
+    { value: 'event', label: 'Мероприятие' }
+  ];
 
   var root = document.getElementById('lookBuilder');
   var authGate = document.getElementById('lbAuthGate');
   if (!root) return;
 
-  var state = { dataUrl: null, session: null };
+  var state = { dataUrl: null, session: null, occasion: null };
 
   function el(tag, className, html) {
     var node = document.createElement(tag);
@@ -106,6 +112,22 @@
     fitField.appendChild(fitLabel);
     fitField.appendChild(fitInput);
 
+    var occasionField = el('div', 'wizard-field');
+    occasionField.appendChild(el('label', null, 'Какой повод — необязательно, но поможет подобрать остальной образ под нужный контекст, а не наугад'));
+    var occasionOptWrap = el('div', 'wizard-options');
+    OCCASIONS.forEach(function (opt) {
+      var optBtn = el('button', 'wizard-option' + (state.occasion === opt.value ? ' is-selected' : ''), opt.label);
+      optBtn.type = 'button';
+      optBtn.addEventListener('click', function () {
+        state.occasion = (state.occasion === opt.value) ? null : opt.value; // повторный клик снимает выбор
+        Array.prototype.forEach.call(occasionOptWrap.children, function (child, i) {
+          child.classList.toggle('is-selected', OCCASIONS[i].value === state.occasion);
+        });
+      });
+      occasionOptWrap.appendChild(optBtn);
+    });
+    occasionField.appendChild(occasionOptWrap);
+
     var goBtn = el('a', 'btn-3d btn-3d--rect', 'Собрать образ');
     goBtn.href = '#';
     goBtn.setAttribute('disabled', '');
@@ -171,18 +193,19 @@
     fieldsRow.appendChild(itemHintField);
     fieldsRow.appendChild(fitField);
     root.appendChild(fieldsRow);
+    root.appendChild(occasionField);
 
     var actions = el('div', 'lb-actions');
     goBtn.addEventListener('click', function (e) {
       e.preventDefault();
       if (goBtn.hasAttribute('disabled') || !state.dataUrl || !consentCheckbox.checked) return;
-      submitLook(status, goBtn, fitInput.value, itemHintInput.value);
+      submitLook(status, goBtn, fitInput.value, itemHintInput.value, state.occasion);
     });
     actions.appendChild(goBtn);
     root.appendChild(actions);
   }
 
-  function submitLook(status, goBtn, fit, itemHint) {
+  function submitLook(status, goBtn, fit, itemHint, occasion) {
     goBtn.setAttribute('disabled', '');
     goBtn.setAttribute('aria-disabled', 'true');
     status.textContent = 'Разбираю фото и собираю образ — это может занять до минуты…';
@@ -194,7 +217,7 @@
         'Content-Type': 'application/json',
         'Authorization': 'Bearer ' + (state.session ? state.session.access_token : '')
       },
-      body: JSON.stringify({ image: state.dataUrl, fit: fit, itemHint: itemHint })
+      body: JSON.stringify({ image: state.dataUrl, fit: fit, itemHint: itemHint, occasion: occasion })
     })
       .then(function (res) {
         if (!res.ok) {
