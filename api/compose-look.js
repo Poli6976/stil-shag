@@ -38,7 +38,7 @@ const { checkRateLimit } = require('../lib/rateLimit');
 const { requireUser } = require('../lib/auth');
 const { previewLookEntitlement, chargeForLook } = require('../lib/lookAccess');
 const { getAccessToken, uploadFile, chatWithImage } = require('../lib/gigachat');
-const { generateLookImage, buildLookImagePrompt } = require('../lib/yandexart');
+const { generateLookImage, buildLookImagePrompt, sizeToBodyPhrase, extractClothingSize } = require('../lib/yandexart');
 const { saveLook } = require('../lib/savedLooks');
 
 const LAYER_KEYS = ['Верх', 'Низ', 'Верхняя одежда', 'Обувь', 'Аксессуары', 'Причёска', 'Макияж'];
@@ -153,6 +153,36 @@ const VERIFY_PROMPT =
   '"Пол: мужской" или "Пол: женский", затем "Слой: значение" для всех слоёв в исходном порядке, затем ' +
   'строка "Реальная вещь: <слой>", затем строка "Почему: " — без вступлений, пояснений и упоминания ' +
   'того, что и почему исправлено.';
+
+/* 2026-09-16 — решение пользователя: вместо очередной правки текста промпта художнику (тело/кадр и
+   так уже проверены — модель обязательно выполняет инструкцию только через раз, это её свойство, не
+   баг конкретной формулировки) — проверяем УЖЕ НАРИСОВАННУЮ картинку вторым вызовом GigaChat (он же
+   умеет смотреть на изображения — используем тот же chatWithImage, что и для фото вещи) и, если
+   картинка явно не подходит, перегенерируем ОДИН раз, прежде чем показать клиентке. Один лишний
+   vision-запрос почти ничего не стоит по сравнению с ценой всего образа; вторая генерация — редкий
+   случай (только когда первая не прошла), не удваивает стоимость каждого образа. */
+function buildImageVerifyPrompt(bodyPhrase) {
+  return 'Ты — контролёр качества fashion-иллюстрации. Тебе показана рисованная картинка в полный ' +
+    'рост. Проверь по пунктам:\n' +
+    '1) Видна ли вся фигура от головы до стоп — ноги и хотя бы условная обувь в кадре, картинка НЕ ' +
+    'обрезана на бёдрах, коленях или голенях.\n' +
+    (bodyPhrase
+      ? '2) Телосложение модели соответствует описанию "' + bodyPhrase + '" — это ЯВНО НЕ стройная/' +
+        'худая модельная фигура, а заметно крупнее.\n'
+      : '') +
+    '\nЕсли по всем пунктам всё в порядке — ответь СТРОГО одним словом без знаков препинания: OK\n' +
+    'Если хотя бы один пункт не выполнен — ответь СТРОГО одним словом без знаков препинания: ПЕРЕСОБРАТЬ';
+}
+
+/* Возвращает true, если картинку стоит перегенерировать. Любая проблема на этом шаге (сеть, лимит,
+   странный ответ) НЕ должна ломать уже готовый результат — тогда просто считаем, что картинка сойдёт
+   как есть (мягкий отказ, тот же принцип, что и у самопроверки текста выше). */
+async function imageNeedsRetry(token, imageBase64, fit) {
+  var bodyPhrase = fit ? sizeToBodyPhrase(extractClothingSize(fit)) : null;
+  var verifyFileId = await uploadFile(token, Buffer.from(imageBase64, 'base64'), 'image/jpeg');
+  var verdict = await chatWithImage(token, buildImageVerifyPrompt(bodyPhrase), 'Проверь эту картинку.', verifyFileId);
+  return verdict.trim().toUpperCase().indexOf('OK') !== 0;
+}
 
 /* Строку "эта же вещь"/"та же вещь" GigaChat иногда пишет вопреки прямому запрету в SYSTEM_PROMPT
    (та же нестабильность, что и с курткой/рубашкой) — если это попадёт в слой, который НЕ совпадает
@@ -299,7 +329,18 @@ module.exports = async function handler(req, res) {
       parsed.layers['Низ'] = FALLBACK_BOTTOM[fallbackOccasion];
       console.warn('compose-look: GigaChat пропустил слой "Низ" (повод: ' + (body.occasion || 'не указан') + ') — подставлен запасной вариант');
     }
-    var imageBase64 = await generateLookImage(buildLookImagePrompt(parsed.layers, fit, null, parsed.gender, parsed.realKey));
+    var imagePrompt = buildLookImagePrompt(parsed.layers, fit, null, parsed.gender, parsed.realKey);
+    var imageBase64 = await generateLookImage(imagePrompt);
+
+    try {
+      var retryNeeded = await imageNeedsRetry(token, imageBase64, fit);
+      if (retryNeeded) {
+        console.warn('compose-look: картинка не прошла проверку (фигура/кадр обрезан) — перегенерирую один раз');
+        imageBase64 = await generateLookImage(imagePrompt);
+      }
+    } catch (imgVerifyErr) {
+      console.error('compose-look: проверка картинки не удалась, используем как есть:', imgVerifyErr);
+    }
 
     /* Списываем только сейчас, когда генерация реально удалась. Если это
        спишет неудачно (крайне редкая гонка — баланс успели потратить между
