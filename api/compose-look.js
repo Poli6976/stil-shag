@@ -332,14 +332,23 @@ module.exports = async function handler(req, res) {
     var imagePrompt = buildLookImagePrompt(parsed.layers, fit, null, parsed.gender, parsed.realKey);
     var imageBase64 = await generateLookImage(imagePrompt);
 
-    try {
-      var retryNeeded = await imageNeedsRetry(token, imageBase64, fit);
-      if (retryNeeded) {
-        console.warn('compose-look: картинка не прошла проверку (фигура/кадр обрезан) — перегенерирую один раз');
+    /* 2026-09-16 — лог с прод-сервера подтвердил, что проверка реально ловит плохие картинки и
+       перегенерирует (было видно "картинка не прошла проверку" в логах), но с одним повтором
+       иногда не везёт дважды подряд — картинка так и остаётся плохой. IMAGE_MAX_ATTEMPTS поднят
+       до 3 (первая попытка + до 2 повторов): цикл проверяет после каждой попытки, кроме
+       последней (её всё равно покажем как есть, лишний запрос на проверку не нужен). */
+    var IMAGE_MAX_ATTEMPTS = 3;
+    for (var attempt = 1; attempt < IMAGE_MAX_ATTEMPTS; attempt++) {
+      try {
+        var retryNeeded = await imageNeedsRetry(token, imageBase64, fit);
+        if (!retryNeeded) break;
+        console.warn('compose-look: картинка не прошла проверку (фигура/кадр обрезан) — перегенерирую (попытка ' +
+          (attempt + 1) + ' из ' + IMAGE_MAX_ATTEMPTS + ')');
         imageBase64 = await generateLookImage(imagePrompt);
+      } catch (imgVerifyErr) {
+        console.error('compose-look: проверка картинки не удалась, используем как есть:', imgVerifyErr);
+        break;
       }
-    } catch (imgVerifyErr) {
-      console.error('compose-look: проверка картинки не удалась, используем как есть:', imgVerifyErr);
     }
 
     /* Списываем только сейчас, когда генерация реально удалась. Если это
