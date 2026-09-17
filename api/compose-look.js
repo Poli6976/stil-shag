@@ -351,6 +351,7 @@ module.exports = async function handler(req, res) {
         if (!retryNeeded) break;
         console.warn('compose-look: картинка не прошла проверку (фигура/кадр обрезан) — перегенерирую (попытка ' +
           (attempt + 1) + ' из ' + IMAGE_MAX_ATTEMPTS + ')');
+        imagePrompt = buildLookImagePrompt(parsed.layers, fit, null, parsed.gender, parsed.realKey, true);
         imageBase64 = await generateLookImage(imagePrompt);
       } catch (imgVerifyErr) {
         console.error('compose-look: проверка картинки не удалась, используем как есть:', imgVerifyErr);
