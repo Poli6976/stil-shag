@@ -40,7 +40,21 @@ const { previewLookEntitlement, chargeForLook } = require('../lib/lookAccess');
 const { getAccessToken, uploadFile, chatWithImage } = require('../lib/gigachat');
 const { generateLookImage, buildLookImagePrompt, sizeToBodyPhrase, extractClothingSize } = require('../lib/yandexart');
 const { saveLook } = require('../lib/savedLooks');
+const { generateLookImageFlux } = require('../lib/flux');
 
+
+
+/* 2026-09-18 — добавлена Flux (Black Forest Labs) как альтернативный
+   провайдер генерации картинки образа: тот же текстовый промпт, тот
+   же контракт (base64 JPEG без data:-префикса), просто другой бэкенд.
+   Включается наличием FLUX_API_KEY в переменных окружения — если его
+   нет, поведение не меняется, используется прежний YandexART. */
+async function generateImage(prompt) {
+  if (process.env.FLUX_API_KEY) {
+    return await generateLookImageFlux(prompt);
+  }
+  return await generateLookImage(prompt);
+}
 const LAYER_KEYS = ['Верх', 'Низ', 'Верхняя одежда', 'Обувь', 'Аксессуары', 'Причёска', 'Макияж'];
 const NO_PERSON_MARKER = 'ОШИБКА';
 /* Те же 4 повода, что и в статичном визарде js/wizard.js (api/looks/charge.js) — без выбора повода
@@ -337,7 +351,7 @@ module.exports = async function handler(req, res) {
       console.warn('compose-look: GigaChat пропустил слой "Низ" (повод: ' + (body.occasion || 'не указан') + ') — подставлен запасной вариант');
     }
     var imagePrompt = buildLookImagePrompt(parsed.layers, fit, null, parsed.gender, parsed.realKey);
-    var imageBase64 = await generateLookImage(imagePrompt);
+    var imageBase64 = await generateImage(imagePrompt);
 
     /* 2026-09-16 — лог с прод-сервера подтвердил, что проверка реально ловит плохие картинки и
        перегенерирует (было видно "картинка не прошла проверку" в логах), но с одним повтором
@@ -352,7 +366,7 @@ module.exports = async function handler(req, res) {
         console.warn('compose-look: картинка не прошла проверку (фигура/кадр обрезан) — перегенерирую (попытка ' +
           (attempt + 1) + ' из ' + IMAGE_MAX_ATTEMPTS + ')');
         imagePrompt = buildLookImagePrompt(parsed.layers, fit, null, parsed.gender, parsed.realKey, true);
-        imageBase64 = await generateLookImage(imagePrompt);
+        imageBase64 = await generateImage(imagePrompt);
       } catch (imgVerifyErr) {
         console.error('compose-look: проверка картинки не удалась, используем как есть:', imgVerifyErr);
         break;
