@@ -40,20 +40,63 @@ const { previewLookEntitlement, chargeForLook } = require('../lib/lookAccess');
 const { getAccessToken, uploadFile, chatWithImage } = require('../lib/gigachat');
 const { generateLookImage, buildLookImagePrompt, sizeToBodyPhrase, extractClothingSize } = require('../lib/yandexart');
 const { saveLook } = require('../lib/savedLooks');
-const { generateLookImageFlux } = require('../lib/flux');
+const { generateLookImageFlux, generateLookImageKontext } = require('../lib/flux');
 
 
 
-/* 2026-09-18 — добавлена Flux (Black Forest Labs) как альтернативный
-   провайдер генерации картинки образа: тот же текстовый промпт, тот
-   же контракт (base64 JPEG без data:-префикса), просто другой бэкенд.
-   Включается наличием FLUX_API_KEY в переменных окружения — если его
-   нет, поведение не меняется, используется прежний YandexART. */
-async function generateImage(prompt) {
-  if (process.env.FLUX_API_KEY) {
-    return await generateLookImageFlux(prompt);
+/* 2026-09-19 — переход с текстовой генерации (Flux text-to-image) на
+   редактирование настоящего фото пользователя через Flux Kontext.
+
+   Почему: и YandexART, и первая версия Flux рисовали картинку ЗАНОВО
+   только по текстовому описанию образа — само фото пользователя в
+   генерацию картинки никогда не передавалось (оно использовалось
+   только на шаге GigaChat, чтобы ОПИСАТЬ словами, что на человеке
+   надето). Поэтому телосложение, цвет вещей и кадрирование каждый раз
+   получались "как повезёт" — у модели просто не было реального фото
+   перед глазами. Так объясняется отзыв клиента "полный провал"
+   (не тот цвет свитера, не та фигура, обрезанный кадр без ног и
+   обуви) — это не баг конкретного промпта, это архитектурное
+   ограничение генерации "из головы".
+
+   Kontext — режим РЕДАКТИРОВАНИЯ картинки (input_image + промпт), а не
+   рисования с нуля: по документации BFL это надёжный способ поменять
+   именно одежду, сохранив лицо/фигуру/позу/фон — но только если явно
+   попросить сохранить их в тексте промпта (см. buildKontextEditPrompt
+   ниже), иначе модель может подменить личность целиком.
+
+   Включается наличием FLUX_API_KEY: если ключа нет — как и раньше,
+   используется YandexART (чистая генерация по тексту, без фото). */
+async function generateImage(layers, gender, realKey, fit, forceFraming, photoBase64) {
+  if (process.env.FLUX_API_KEY && photoBase64) {
+    var kontextPrompt = buildKontextEditPrompt(layers, gender, forceFraming);
+    return await generateLookImageKontext(kontextPrompt, photoBase64);
   }
-  return await generateLookImage(prompt);
+  var yandexPrompt = buildLookImagePrompt(layers, fit, null, gender, realKey, forceFraming);
+  return await generateLookImage(yandexPrompt);
+}
+
+/* Промпт для Flux Kontext — в отличие от buildLookImagePrompt (yandexart.js,
+   промпт для рисования с нуля), здесь явно указано, что редактируем
+   существующее фото и что именно нужно СОХРАНИТЬ без изменений: без этого
+   Kontext может заменить не только одежду, но и лицо/фигуру/фон. */
+function buildKontextEditPrompt(layers, gender, forceFraming) {
+  var parts = [];
+  var order = ['Верх', 'Низ', 'Верхняя одежда', 'Обувь', 'Аксессуары'];
+  order.forEach(function (key) {
+    if (layers[key]) parts.push(key.toLowerCase() + ': ' + layers[key]);
+  });
+  var clothingText = parts.join('; ');
+
+  var hairText = layers['Причёска'] ? ' Причёску сделай такой: ' + layers['Причёска'] + '.' : '';
+  var makeupText = layers['Макияж'] ? ' Макияж: ' + layers['Макияж'] + '.' : '';
+  var framingNote = forceFraming
+    ? ' Не обрезай кадр и не меняй масштаб/ракурс — вся фигура должна остаться в кадре так же, как на исходном фото.'
+    : '';
+
+  return 'Поменяй одежду человека на фото на следующую: ' + clothingText + '.' + hairText + makeupText +
+    ' Обязательно сохрани то же самое лицо, то же телосложение (не делай стройнее и не меняй пропорции ' +
+    'тела), ту же позу и тот же фон — редактируй только перечисленную одежду, причёску и макияж, ничего ' +
+    'больше не меняй.' + framingNote;
 }
 const LAYER_KEYS = ['Верх', 'Низ', 'Верхняя одежда', 'Обувь', 'Аксессуары', 'Причёска', 'Макияж'];
 const NO_PERSON_MARKER = 'ОШИБКА';
@@ -350,8 +393,7 @@ module.exports = async function handler(req, res) {
       parsed.layers['Низ'] = FALLBACK_BOTTOM[fallbackOccasion];
       console.warn('compose-look: GigaChat пропустил слой "Низ" (повод: ' + (body.occasion || 'не указан') + ') — подставлен запасной вариант');
     }
-    var imagePrompt = buildLookImagePrompt(parsed.layers, fit, null, parsed.gender, parsed.realKey);
-    var imageBase64 = await generateImage(imagePrompt);
+    var imageBase64 = await generateImage(parsed.layers, parsed.gender, parsed.realKey, fit, false, imageBuffer.toString('base64'));
 
     /* 2026-09-16 — лог с прод-сервера подтвердил, что проверка реально ловит плохие картинки и
        перегенерирует (было видно "картинка не прошла проверку" в логах), но с одним повтором
@@ -365,8 +407,7 @@ module.exports = async function handler(req, res) {
         if (!retryNeeded) break;
         console.warn('compose-look: картинка не прошла проверку (фигура/кадр обрезан) — перегенерирую (попытка ' +
           (attempt + 1) + ' из ' + IMAGE_MAX_ATTEMPTS + ')');
-        imagePrompt = buildLookImagePrompt(parsed.layers, fit, null, parsed.gender, parsed.realKey, true);
-        imageBase64 = await generateImage(imagePrompt);
+        imageBase64 = await generateImage(parsed.layers, parsed.gender, parsed.realKey, fit, true, imageBuffer.toString('base64'));
       } catch (imgVerifyErr) {
         console.error('compose-look: проверка картинки не удалась, используем как есть:', imgVerifyErr);
         break;
