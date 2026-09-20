@@ -307,17 +307,35 @@ const VERIFY_PROMPT =
    картинка явно не подходит, перегенерируем ОДИН раз, прежде чем показать клиентке. Один лишний
    vision-запрос почти ничего не стоит по сравнению с ценой всего образа; вторая генерация — редкий
    случай (только когда первая не прошла), не удваивает стоимость каждого образа. */
-function buildImageVerifyPrompt(bodyPhrase, layers) {
+/* 2026-09-20 — для Kontext (правка реального фото) точнее сравнивать телосложение НАПРЯМУЮ с
+   исходным фото клиентки, а не с текстовым описанием размера: текстовая шкала ("крупная фигура,
+   плюс-сайз" и её соседние варианты) на живых тестах вела себя непредсказуемо — то давала перебор,
+   то недобор, независимо от конкретной формулировки, а сам Kontext правит реальный снимок, значит
+   у него и так есть с чем сравнивать. bothPhotos=true — второй, более строгий и симметричный режим:
+   на вход идут ДВЕ картинки (исходное фото первым вложением, результат вторым), и проверяется не
+   "заметно крупнее худой модели" (старая проверка ловила только недобор), а "такое же по объёму,
+   не крупнее и не мельче" (ловит перебор тоже). Для YandexART-fallback (рисование с нуля, реального
+   фото у него нет) оставляю старую текстовую проверку как была. */
+function buildImageVerifyPrompt(bodyPhrase, layers, bothPhotos) {
   var VERIFY_SKIP = ['Макияж', 'Уход', 'Обувь', 'Аксессуары'];
   var clothingList = layers ? Object.keys(layers).filter(function (k) { return VERIFY_SKIP.indexOf(k) === -1 && layers[k]; }).map(function (k) { return k + ': ' + layers[k]; }).join('; ') : '';
-  return 'Ты — контролёр качества fashion-иллюстрации. Тебе показана рисованная картинка в полный ' +
-    'рост. Проверь по пунктам:\n' +
-    '1) Видна ли вся фигура от головы до стоп — ноги и хотя бы условная обувь в кадре, картинка НЕ ' +
-    'обрезана на бёдрах, коленях или голенях.\n' +
-    (bodyPhrase
-      ? '2) Телосложение модели соответствует описанию "' + bodyPhrase + '" — это ЯВНО НЕ стройная/' +
-        'худая модельная фигура, а заметно крупнее.\n'
-      : '') +
+  var intro = bothPhotos
+    ? 'Ты — контролёр качества fashion-иллюстрации. Тебе показаны ДВЕ картинки: ПЕРВАЯ — исходное ' +
+      'фото клиентки, ВТОРАЯ — результат обработки (рисованная картинка в полный рост). Проверь по ' +
+      'пунктам:\n'
+    : 'Ты — контролёр качества fashion-иллюстрации. Тебе показана рисованная картинка в полный ' +
+      'рост. Проверь по пунктам:\n';
+  return intro +
+    '1) На ВТОРОЙ' + (bothPhotos ? '' : ' (единственной)') + ' картинке видна ли вся фигура от ' +
+    'головы до стоп — ноги и хотя бы условная обувь в кадре, картинка НЕ обрезана на бёдрах, ' +
+    'коленях или голенях.\n' +
+    (bothPhotos
+      ? '2) Телосложение человека на ВТОРОЙ картинке — такое же по объёму/комплекции, как на ПЕРВОЙ ' +
+        '(исходное фото): не стройнее и не крупнее, без преувеличения в любую сторону.\n'
+      : (bodyPhrase
+        ? '2) Телосложение модели соответствует описанию "' + bodyPhrase + '" — это ЯВНО НЕ стройная/' +
+          'худая модельная фигура, а заметно крупнее.\n'
+        : '')) +
     (clothingList
       ? '3) Видны ли на картинке ВСЕ перечисленные вещи одежды по типу (юбка/брюки/куртка и т.п. — точный ' +
         'оттенок цвета не важен): ' + clothingList + '. Если хотя бы одна вещь из списка отсутствует на ' +
@@ -329,11 +347,21 @@ function buildImageVerifyPrompt(bodyPhrase, layers) {
 
 /* Возвращает true, если картинку стоит перегенерировать. Любая проблема на этом шаге (сеть, лимит,
    странный ответ) НЕ должна ломать уже готовый результат — тогда просто считаем, что картинка сойдёт
-   как есть (мягкий отказ, тот же принцип, что и у самопроверки текста выше). */
-async function imageNeedsRetry(token, imageBase64, fit, layers) {
-  var bodyPhrase = fit ? sizeToBodyPhrase(extractClothingSize(fit)) : null;
+   как есть (мягкий отказ, тот же принцип, что и у самопроверки текста выше).
+   originalFileId — id уже загруженного в GigaChat фото клиентки (см. handler ниже, оно грузится один
+   раз для разбора вещи и переиспользуется здесь) — передаётся только когда картинку рисовал Kontext,
+   чтобы включить прямое сравнение с реальным фото вместо текстовой проверки размера. */
+async function imageNeedsRetry(token, imageBase64, fit, layers, originalFileId) {
   var verifyFileId = await uploadFile(token, Buffer.from(imageBase64, 'base64'), 'image/jpeg');
-  var verdict = await chatWithImage(token, buildImageVerifyPrompt(bodyPhrase, layers), 'Проверь эту картинку.', verifyFileId);
+  var bothPhotos = !!originalFileId;
+  var bodyPhrase = !bothPhotos && fit ? sizeToBodyPhrase(extractClothingSize(fit)) : null;
+  var attachments = bothPhotos ? [originalFileId, verifyFileId] : verifyFileId;
+  var verdict = await chatWithImage(
+    token,
+    buildImageVerifyPrompt(bodyPhrase, layers, bothPhotos),
+    'Проверь эту картинку.',
+    attachments
+  );
   return verdict.trim().toUpperCase().indexOf('OK') !== 0;
 }
 
@@ -482,6 +510,7 @@ module.exports = async function handler(req, res) {
       parsed.layers['Низ'] = FALLBACK_BOTTOM[fallbackOccasion];
       console.warn('compose-look: GigaChat пропустил слой "Низ" (повод: ' + (body.occasion || 'не указан') + ') — подставлен запасной вариант');
     }
+    var usingKontext = !!process.env.FLUX_API_KEY;
     var imageBase64 = await generateImage(parsed.layers, parsed.gender, parsed.realKey, fit, false, imageBuffer.toString('base64'));
 
     /* 2026-09-16 — лог с прод-сервера подтвердил, что проверка реально ловит плохие картинки и
@@ -492,7 +521,7 @@ module.exports = async function handler(req, res) {
     var IMAGE_MAX_ATTEMPTS = 3;
     for (var attempt = 1; attempt < IMAGE_MAX_ATTEMPTS; attempt++) {
       try {
-        var retryNeeded = await imageNeedsRetry(token, imageBase64, fit, parsed.layers);
+        var retryNeeded = await imageNeedsRetry(token, imageBase64, fit, parsed.layers, usingKontext ? fileId : null);
         if (!retryNeeded) break;
         console.warn('compose-look: картинка не прошла проверку (фигура/кадр обрезан) — перегенерирую (попытка ' +
           (attempt + 1) + ' из ' + IMAGE_MAX_ATTEMPTS + ')');
