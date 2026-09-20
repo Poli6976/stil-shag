@@ -6,10 +6,10 @@
 (function () {
   var LAYER_LABELS = ['Верх', 'Низ', 'Верхняя одежда', 'Обувь', 'Аксессуары', 'Причёска', 'Макияж'];
   var OCCASIONS = [
-    { value: 'office', label: 'Офис' },
-    { value: 'walk', label: 'Прогулка' },
-    { value: 'evening', label: 'Вечер' },
-    { value: 'event', label: 'Мероприятие' }
+    { value: 'office', label: 'Офис', hint: 'Деловой стиль, для работы' },
+    { value: 'walk', label: 'Прогулка', hint: 'Повседневный, для прогулки' },
+    { value: 'evening', label: 'Вечер', hint: 'Нарядный вечерний выход — свидание, ужин' },
+    { value: 'event', label: 'Мероприятие', hint: 'Официальный повод — конференция, торжество' }
   ];
 
   var root = document.getElementById('lookBuilder');
@@ -118,6 +118,7 @@
     OCCASIONS.forEach(function (opt) {
       var optBtn = el('button', 'wizard-option' + (state.occasion === opt.value ? ' is-selected' : ''), opt.label);
       optBtn.type = 'button';
+      if (opt.hint) optBtn.title = opt.hint;
       optBtn.addEventListener('click', function () {
         state.occasion = (state.occasion === opt.value) ? null : opt.value; // повторный клик снимает выбор
         Array.prototype.forEach.call(occasionOptWrap.children, function (child, i) {
