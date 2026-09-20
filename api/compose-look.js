@@ -70,6 +70,7 @@ async function generateImage(layers, gender, realKey, fit, forceFraming, photoBa
   if (process.env.FLUX_API_KEY && photoBase64) {
     console.log('compose-look: генерация картинки — Flux Kontext (правка реального фото)');
     var kontextPrompt = buildKontextEditPrompt(layers, gender, forceFraming, fit);
+    console.log('compose-look: Kontext-промпт целиком —', kontextPrompt);
     return await generateLookImageKontext(kontextPrompt, photoBase64);
   }
   console.log('compose-look: генерация картинки — YandexART fallback (нет FLUX_API_KEY или фото)');
