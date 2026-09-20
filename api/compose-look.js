@@ -116,7 +116,23 @@ async function generateImage(layers, gender, realKey, fit, forceFraming, photoBa
    расплывчатое "то же телосложение" эта модель, похоже, тоже недооценивает,
    как когда-то YandexART недооценивал "полная фигура" без конкретики. Здесь
    применяю тот же приём: если есть рост/размер, добавляю ту же самую
-   формулировку явно, вместо общей фразы. */
+   формулировку явно, вместо общей фразы.
+
+   2026-09-20, вторая правка — на живом тесте формулировка "крупная фигура,
+   плюс-сайз" (порог sizeToBodyPhrase для размера 62) сработала СИЛЬНЕЕ, чем
+   на YandexART: получилась фигура крупнее реальной. Специально НЕ трогаю
+   sizeToBodyPhrase в lib/yandexart.js — её пороги калибровались отдельно и
+   долго именно под YandexART, общий код тут риск, а не экономия (YandexART-
+   fallback тоже её использует и уже проверенно работает как есть). Вместо
+   этого — своя, отдельная шкала специально для Kontext (мягче на один
+   уровень), которую можно крутить дальше независимо от YandexART. */
+function kontextBodyPhrase(size) {
+  if (size === null || size <= 46) return null; // близко к типовой фигуре — уточнять нечего
+  if (size <= 50) return 'плотнее среднего';
+  if (size <= 62) return 'полная фигура, плюс-сайз'; // было до 54 у YandexART — здесь порог поднят
+  if (size <= 74) return 'крупная фигура, плюс-сайз'; // было до 66 у YandexART — сдвинуто соответственно
+  return 'очень крупная фигура, большой плюс-сайз';
+}
 function buildKontextEditPrompt(layers, gender, forceFraming, fit) {
   var sentences = [];
   if (layers['Верх']) {
@@ -153,7 +169,7 @@ function buildKontextEditPrompt(layers, gender, forceFraming, fit) {
   sentences.push('Замени фон на нейтральный светлый студийный фон и сделай мягкое ровное студийное ' +
     'освещение, как в профессиональной fashion-съёмке для каталога.');
 
-  var bodyPhrase = sizeToBodyPhrase(extractClothingSize(fit));
+  var bodyPhrase = kontextBodyPhrase(extractClothingSize(fit));
   var bodyNote = bodyPhrase
     ? ' Телосложение — ' + bodyPhrase + ', как на исходном фото: не делай фигуру стройнее и не меняй пропорции тела.'
     : ' Сохрани то же телосложение.';
