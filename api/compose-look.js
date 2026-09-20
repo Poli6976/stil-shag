@@ -69,7 +69,7 @@ const { generateLookImageFlux, generateLookImageKontext } = require('../lib/flux
 async function generateImage(layers, gender, realKey, fit, forceFraming, photoBase64) {
   if (process.env.FLUX_API_KEY && photoBase64) {
     console.log('compose-look: генерация картинки — Flux Kontext (правка реального фото)');
-    var kontextPrompt = buildKontextEditPrompt(layers, gender, forceFraming);
+    var kontextPrompt = buildKontextEditPrompt(layers, gender, forceFraming, fit);
     return await generateLookImageKontext(kontextPrompt, photoBase64);
   }
   console.log('compose-look: генерация картинки — YandexART fallback (нет FLUX_API_KEY или фото)');
@@ -105,8 +105,19 @@ async function generateImage(layers, gender, realKey, fit, forceFraming, photoBa
    "сделай красиво") и убираю "тот же фон" из блока сохранения ниже, чтобы не
    противоречить новой команде. Это эксперимент: не исключено, что правка фона
    заодно ослабит точность одежды — тогда либо уберём эту строку, либо оставим
-   галочку клиенту (компромисс — его явный выбор, не мой). */
-function buildKontextEditPrompt(layers, gender, forceFraming) {
+   галочку клиенту (компромисс — его явный выбор, не мой).
+
+   2026-09-20 — живой тест показал: даже с реальным фото под рукой Kontext
+   рисует фигуру стройнее, чем на исходнике (плюс-сайз клиентка, размер 62,
+   3 попытки подряд — все мимо), хотя инструкция "сохрани то же телосложение"
+   в промпте уже есть. Сравнение со старой YandexART-веткой навело на разгадку:
+   там точно такая же проблема была решена не общей фразой, а КОНКРЕТНОЙ
+   словесной формулировкой размера (sizeToBodyPhrase, см. lib/yandexart.js) —
+   расплывчатое "то же телосложение" эта модель, похоже, тоже недооценивает,
+   как когда-то YandexART недооценивал "полная фигура" без конкретики. Здесь
+   применяю тот же приём: если есть рост/размер, добавляю ту же самую
+   формулировку явно, вместо общей фразы. */
+function buildKontextEditPrompt(layers, gender, forceFraming, fit) {
   var sentences = [];
   if (layers['Верх']) {
     sentences.push('Замени верх (то, что надето выше пояса) на: ' + layers['Верх'] + '.');
@@ -142,12 +153,17 @@ function buildKontextEditPrompt(layers, gender, forceFraming) {
   sentences.push('Замени фон на нейтральный светлый студийный фон и сделай мягкое ровное студийное ' +
     'освещение, как в профессиональной fashion-съёмке для каталога.');
 
+  var bodyPhrase = sizeToBodyPhrase(extractClothingSize(fit));
+  var bodyNote = bodyPhrase
+    ? ' Телосложение — ' + bodyPhrase + ', как на исходном фото: не делай фигуру стройнее и не меняй пропорции тела.'
+    : ' Сохрани то же телосложение.';
+
   var framingNote = forceFraming
     ? ' Не обрезай кадр и не меняй масштаб/ракурс — вся фигура должна остаться в кадре так же, как на исходном фото.'
     : '';
 
   return sentences.join(' ') +
-    ' Сохрани то же лицо, то же телосложение и позу.' + framingNote;
+    ' Сохрани то же лицо и позу.' + bodyNote + framingNote;
 }
 const LAYER_KEYS = ['Верх', 'Низ', 'Верхняя одежда', 'Обувь', 'Аксессуары', 'Причёска', 'Макияж'];
 const NO_PERSON_MARKER = 'ОШИБКА';
