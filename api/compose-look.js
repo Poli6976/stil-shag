@@ -68,9 +68,11 @@ const { generateLookImageFlux, generateLookImageKontext } = require('../lib/flux
    используется YandexART (чистая генерация по тексту, без фото). */
 async function generateImage(layers, gender, realKey, fit, forceFraming, photoBase64) {
   if (process.env.FLUX_API_KEY && photoBase64) {
+    console.log('compose-look: генерация картинки — Flux Kontext (правка реального фото)');
     var kontextPrompt = buildKontextEditPrompt(layers, gender, forceFraming);
     return await generateLookImageKontext(kontextPrompt, photoBase64);
   }
+  console.log('compose-look: генерация картинки — YandexART fallback (нет FLUX_API_KEY или фото)');
   var yandexPrompt = buildLookImagePrompt(layers, fit, null, gender, realKey, forceFraming);
   return await generateLookImage(yandexPrompt);
 }
