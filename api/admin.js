@@ -81,6 +81,41 @@ function requireSupabaseEnv(res) {
   return true;
 }
 
+/* Название — убираем кавычки-«ёлочки»/обычные кавычки и лишние пробелы, чтобы
+   "Бутик «Анна»" и "бутик анна" считались одним и тем же партнёром.
+   Контакт — если это в основном цифры (телефон), сравниваем по последним 10
+   цифрам: "+7 999 123-45-67", "8 (999) 123-45-67" и "89991234567" — один и тот
+   же номер в разном написании. Иначе (Telegram/email) — просто регистр+пробелы. */
+function normalizePartnerText(str) {
+  return String(str || '').trim().toLowerCase().replace(/[«»"']/g, '').replace(/\s+/g, ' ');
+}
+function normalizeContact(str) {
+  var digits = String(str || '').replace(/\D/g, '');
+  if (digits.length >= 10 && digits.length / String(str || '').trim().length > 0.5) {
+    return digits.slice(-10);
+  }
+  return normalizePartnerText(str);
+}
+
+/* Сайтов-магазинов много и они похожи — при ручном приглашении партнёров легко
+   случайно завести того же самого продавца второй раз. slug (единственное, что
+   раньше проверялось на уникальность) для этого не годится — он генерируется
+   из названия и при коллизии просто получает случайный суффикс, а не отказывает
+   в добавлении. Ищем совпадение по названию ИЛИ по контакту среди уже
+   существующих партнёров (независимо от активен/неактивен — неактивного тоже
+   не нужно заводить повторно, проще снова его активировать). */
+async function findDuplicatePartner(supabase, name, contact) {
+  var result = await supabase.from('partners').select('id, name, contact, status');
+  if (result.error) throw result.error;
+  var normName = normalizePartnerText(name);
+  var normContact = contact ? normalizeContact(contact) : null;
+  return (result.data || []).find(function (p) {
+    if (normalizePartnerText(p.name) === normName) return true;
+    if (normContact && p.contact && normalizeContact(p.contact) === normContact) return true;
+    return false;
+  }) || null;
+}
+
 async function handleListPartners(req, res) {
   if (!checkAdminKey(req.headers && req.headers['x-admin-key'])) {
     res.status(401).json({ error: 'Неверный админ-ключ.' });
@@ -117,6 +152,18 @@ async function handleAddPartner(req, res) {
 
   try {
     var supabase = getSupabaseAdmin();
+
+    var duplicate = await findDuplicatePartner(supabase, name, contact);
+    if (duplicate) {
+      res.status(409).json({
+        error: 'Такой партнёр уже есть: «' + duplicate.name + '»' +
+          (duplicate.contact ? ' (' + duplicate.contact + ')' : '') +
+          ', статус: ' + (duplicate.status === 'active' ? 'активен' : 'неактивен') +
+          '. Проверьте список партнёров ниже, прежде чем добавлять повторно — сайтов много, но это тот же партнёр.'
+      });
+      return;
+    }
+
     // baseSlug почти всегда свободен — цикл только на случай совпадения с
     // уже существующим партнёром (например, два партнёра с похожим названием).
     for (var attempt = 0; attempt < 5; attempt++) {
