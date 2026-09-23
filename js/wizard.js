@@ -477,8 +477,8 @@
       photoConsentCheckbox.type = 'checkbox';
       photoConsentWrap.appendChild(photoConsentCheckbox);
       photoConsentWrap.appendChild(el('span', null,
-        'Согласен(на) на обработку фото вещи сервисом распознавания изображений GigaChat — фото ' +
-        'уходит только туда и не хранится на сайте после ответа. Подробнее — ' +
+        'Согласен(на) на обработку фото вещи сервисом распознавания изображений — фото ' +
+        'не хранится на сайте после ответа. Подробнее — ' +
         '<a href="legal-privacy.html" target="_blank" rel="noopener">Политика конфиденциальности</a>.'
       ));
       photoField.appendChild(photoConsentWrap);
