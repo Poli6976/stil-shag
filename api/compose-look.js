@@ -656,11 +656,20 @@ module.exports = async function handler(req, res) {
         console.error('compose-look: повторный запрос про платье не удался, используем первый ответ:', repairErr);
       }
     }
-    /* Платье закрывает обе роли: если одна из строк пропала — берём описание платья из другой, а не запасную юбку/брюки. */
-    if (DRESS_RE.test(itemHint) && !parsed.layers['Низ'] && DRESS_RE.test(parsed.layers['Верх'] || '')) {
-      parsed.layers['Низ'] = parsed.layers['Верх'];
-    } else if (DRESS_RE.test(itemHint) && !parsed.layers['Верх'] && DRESS_RE.test(parsed.layers['Низ'] || '')) {
-      parsed.layers['Верх'] = parsed.layers['Низ'];
+    /* Платье закрывает обе роли: если платье есть только в одной из строк "Верх"/"Низ" — копируем его описание
+       в другую поверх придуманной юбки/блузки/брюк (живой тест 2026-09-30: "Верх: чёрное платье", "Низ:
+       чёрная юбка-карандаш" — на картинке платье, а в карточке платье и юбка одновременно). "Почему"
+       при такой подмене очищаем: там GigaChat объяснял замену платья юбкой и футболкой, которой уже нет. */
+    if (DRESS_RE.test(itemHint)) {
+      var topHasDress = DRESS_RE.test(parsed.layers['Верх'] || '');
+      var bottomHasDress = DRESS_RE.test(parsed.layers['Низ'] || '');
+      if (topHasDress && !bottomHasDress) {
+        parsed.layers['Низ'] = parsed.layers['Верх'];
+        parsed.why = '';
+      } else if (bottomHasDress && !topHasDress) {
+        parsed.layers['Верх'] = parsed.layers['Низ'];
+        parsed.why = '';
+      }
     }
 
     if (!parsed.layers['Низ']) {
