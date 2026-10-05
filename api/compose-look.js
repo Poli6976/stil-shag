@@ -69,9 +69,9 @@ const { generateLookImageFlux, generateLookImageKontext, generateLookImageFlux2 
 /* Возвращает { image: base64, editedPhoto: true|false } — editedPhoto говорит проверке картинки, можно ли
    сравнивать результат с исходным фото (лицо/фигура): у YandexART картинка нарисована с нуля, и такое
    сравнение браковало бы её всегда. */
-async function generateImage(layers, gender, realKey, fit, forceFraming, photoBase64, keepKeys) {
+async function generateImage(layers, gender, realKey, fit, forceFraming, photoBase64, keepKeys, hairColor) {
   if (process.env.FLUX_API_KEY && photoBase64) {
-    var kontextPrompt = buildKontextEditPrompt(layers, gender, forceFraming, keepKeys);
+    var kontextPrompt = buildKontextEditPrompt(layers, gender, forceFraming, keepKeys, hairColor);
     console.log('compose-look: промпт правки фото целиком —', kontextPrompt);
     /* 2026-10-05 — сначала FLUX.2 [pro] (см. lib/flux.js), при любой его ошибке — прежний Kontext [pro],
        чтобы новая модель не могла уронить сайт. Промпт тот же. */
@@ -171,13 +171,19 @@ var KEEP_SENTENCE = {
   'Верхняя одежда': 'Верхнюю одежду (то, что надето поверх) оставь точно такой же, как на исходном фото — эту вещь не меняй.'
 };
 
-function buildKontextEditPrompt(layers, gender, forceFraming, keepKeys) {
+function buildKontextEditPrompt(layers, gender, forceFraming, keepKeys, hairColor) {
   keepKeys = keepKeys || [];
   var sentences = [];
   if (keepKeys.indexOf('Верх') !== -1) {
     sentences.push(KEEP_SENTENCE['Верх']);
   } else if (layers['Верх']) {
     sentences.push('Замени верх (то, что надето выше пояса) на: ' + layers['Верх'] + '.');
+  }
+  /* 2026-10-05 — живой тест "блузка джемпер": оверсайз-джемпер клиентки FLUX.2 заправил в брюки под
+     приталенный пиджак, и он стал выглядеть шёлковой блузкой. Для вязаного верха называем посадку прямо
+     (позитивно, без слова "заправлен" — модели цепляются за названное слово). */
+  if (/кофт|свитер|джемпер|пуловер|свитшот|худи/i.test(layers['Верх'] || '')) {
+    sentences.push('Верх надет навыпуск: его нижний край свободно лежит поверх низа, мягкий вязаный силуэт сохраняется.');
   }
   if (keepKeys.indexOf('Низ') !== -1) {
     sentences.push(KEEP_SENTENCE['Низ']);
@@ -210,7 +216,8 @@ function buildKontextEditPrompt(layers, gender, forceFraming, keepKeys) {
     sentences.push('Добавь аксессуары: ' + layers['Аксессуары'] + '.');
   }
   if (layers['Причёска']) {
-    sentences.push('Сделай причёску такой: ' + layers['Причёска'] + '.');
+    sentences.push('Сделай причёску такой: ' + layers['Причёска'] +
+      (hairColor ? '; цвет волос — ' + hairColor + ', как на исходном фото' : '') + '.');
   }
   if (layers['Макияж']) {
     sentences.push('Сделай макияж таким: ' + layers['Макияж'] + '.');
@@ -259,8 +266,13 @@ function buildKontextEditPrompt(layers, gender, forceFraming, keepKeys) {
      "бежевым"). Никаких слов про возраст/кожу — только "то же лицо, что на фото". */
   /* 2026-10-05, третья правка — FLUX.2 по команде "сделай причёску: лёгкие волны" заодно перекрасил
      тёмные волосы в светлые, и человек стал выглядеть другим. Укладка меняется, цвет волос — нет. */
+  /* 2026-10-05, четвёртая правка — "цвет волос тот же" не удержал: на живых тестах тёмные волосы стали
+     светлыми, платиновый блонд — каштановым. GigaChat видит фото и называет цвет словами (строка "Цвет
+     волос" в SYSTEM_PROMPT) — конкретное название держится лучше ссылки "тот же" (тот же урок, что "в тон
+     рубашке"). Если цвет не назван — прежняя фраза. */
+  var hairPhrase = hairColor ? 'цвет волос тот же — ' + hairColor : 'цвет волос тот же';
   var faceNote = 'Это тот же самый человек, что на исходном фото: лицо оставь полностью без изменений — ' +
-    'точно такое же, как на исходном фото, и цвет волос тот же. Укладку причёски, макияж, одежду, обувь, ' +
+    'точно такое же, как на исходном фото, и ' + hairPhrase + '. Укладку причёски, макияж, одежду, обувь, ' +
     'аксессуары и фон меняй по командам ниже, само лицо и цвет волос — нет.';
 
   return faceNote + ' ' + sentences.join(' ') +
@@ -412,6 +424,9 @@ const SYSTEM_PROMPT =
   'одного из слоёв выше (' + LAYER_KEYS.join(', ') + ') — тем, который действительно есть на фото, а не ' +
   'придуман тобой. Это нужно, чтобы при рисовании картинки эта вещь получила приоритет над остальными, ' +
   'придуманными слоями.\n' +
+  'Следующей строкой — "Цвет волос: <цвет>" — НАСТОЯЩИЙ цвет волос человека на фото, как он есть сейчас, ' +
+  'конкретно и коротко (например "тёмно-каштановый", "пепельный блонд", "чёрный"). Это не рекомендация, а ' +
+  'описание фото: художник по нему сохранит цвет волос. Если волос не видно (головной убор) — "Цвет волос: не видно".\n' +
   'В самом конце — ещё одна строка "Почему: " с 1-2 предложениями логики по силуэту и цвету. Конкретно, ' +
   'без оценочных слов вроде "прекрасно".';
 
@@ -458,7 +473,8 @@ const VERIFY_PROMPT =
   'Если ошибок нет — ответь СТРОГО одним словом без знаков препинания: OK\n' +
   'Если есть хотя бы одна ошибка — верни ИСПРАВЛЕННУЮ версию целиком, СТРОГО построчно: сначала строка ' +
   '"Пол: мужской" или "Пол: женский", затем "Слой: значение" для всех слоёв в исходном порядке, затем ' +
-  'строка "Реальная вещь: <слой>", затем строка "Почему: " — без вступлений, пояснений и упоминания ' +
+  'строка "Реальная вещь: <слой>", затем строка "Цвет волос: " (как в разборе), затем строка "Почему: " — ' +
+  'без вступлений, пояснений и упоминания ' +
   'того, что и почему исправлено.';
 
 /* 2026-09-16 — решение пользователя: вместо очередной правки текста промпта художнику (тело/кадр и
@@ -498,9 +514,13 @@ function buildImageVerifyPrompt(bodyPhrase, layers, bothPhotos) {
     (bothPhotos
       ? '2) Телосложение человека на ВТОРОЙ картинке — такое же по объёму/комплекции, как на ПЕРВОЙ ' +
         '(исходное фото): не стройнее и не крупнее, без преувеличения в любую сторону.\n' +
-        '2б) Лицо на ВТОРОЙ картинке — того же самого человека, что на ПЕРВОЙ: те же черты лица, тот же ' +
-        'возраст (не моложе и не старше). Причёска и макияж МОГУТ отличаться — это нормально, сравнивай только ' +
-        'само лицо. Если это явно другой человек (как с другой фотографии) — это нарушение пункта.\n'
+        /* 2026-10-05 — "те же черты лица" браковал почти каждую попытку (9 генераций на 3 образа), а в 2 из
+           3 образов не прошла даже третья: на фото в полный рост лицо мелкое, мелкие черты GigaChat надёжно
+           не сравнит. Проверяем то, что он видит уверенно: цвет волос, возраст, тип внешности. */
+        '2б) Человек на ВТОРОЙ картинке узнаётся как тот же, что на ПЕРВОЙ: тот же цвет волос (светлые ' +
+        'остались светлыми, тёмные — тёмными; укладка и длина могут отличаться), примерно тот же возраст и ' +
+        'тот же тип внешности. Мелкие черты лица НЕ сравнивай — на исходном фото лицо может быть мелким или ' +
+        'нечётким. Нарушение — только если по этим признакам заметно другой человек.\n'
       : (bodyPhrase
         ? '2) Телосложение модели соответствует описанию "' + bodyPhrase + '" — это ЯВНО НЕ стройная/' +
           'худая модельная фигура, а заметно крупнее.\n'
@@ -612,6 +632,7 @@ function parseLayers(text) {
   var why = '';
   var gender = 'female'; // дефолт сайта, если строку "Пол" не прислали вовсе
   var realKey = null;
+  var hairColor = '';
   text.split('\n').forEach(function (line) {
     var idx = line.indexOf(':');
     if (idx === -1) return;
@@ -621,12 +642,16 @@ function parseLayers(text) {
     if (key === 'Почему') { why = value; return; }
     if (key === 'Пол') { gender = /муж/i.test(value) ? 'male' : 'female'; return; }
     if (key === 'Реальная вещь') { if (LAYER_KEYS.indexOf(value) !== -1) realKey = value; return; }
+    if (key === 'Цвет волос') {
+      if (!/не\s*видн|неизвест|скрыт/i.test(value)) hairColor = value.replace(/[."«»]+$/g, '').trim().slice(0, 60);
+      return;
+    }
     if (LAYER_KEYS.indexOf(key) !== -1) {
       var cleaned = value.replace(SAME_ITEM_PREFIX_RE, '').trim();
       if (cleaned) layers[key] = cleaned;
     }
   });
-  return { layers: layers, why: why, gender: gender, realKey: realKey };
+  return { layers: layers, why: why, gender: gender, realKey: realKey, hairColor: hairColor };
 }
 
 module.exports = async function handler(req, res) {
@@ -800,8 +825,10 @@ module.exports = async function handler(req, res) {
       }
     }
     var keepKeys = keepLayerKeys(itemHint, parsed.layers, parsed.realKey);
-    console.log('compose-look: слои —', JSON.stringify(parsed.layers), '| настоящая вещь:', JSON.stringify(keepKeys));
-    var generated = await generateImage(parsed.layers, parsed.gender, parsed.realKey, fit, false, imageBuffer.toString('base64'), keepKeys);
+    /* Исправленная самопроверкой версия может потерять строку "Цвет волос" — тогда берём из первого ответа. */
+    var hairColor = parsed.hairColor || parseLayers(raw).hairColor;
+    console.log('compose-look: слои —', JSON.stringify(parsed.layers), '| настоящая вещь:', JSON.stringify(keepKeys), '| цвет волос:', hairColor || 'не назван');
+    var generated = await generateImage(parsed.layers, parsed.gender, parsed.realKey, fit, false, imageBuffer.toString('base64'), keepKeys, hairColor);
     var imageBase64 = generated.image;
     var editedPhoto = generated.editedPhoto;
 
@@ -835,7 +862,7 @@ module.exports = async function handler(req, res) {
       console.warn('compose-look: картинка не прошла проверку — перегенерирую (попытка ' +
         (attempt + 1) + ' из ' + IMAGE_MAX_ATTEMPTS + ')');
       try {
-        generated = await generateImage(parsed.layers, parsed.gender, parsed.realKey, fit, true, imageBuffer.toString('base64'), keepKeys);
+        generated = await generateImage(parsed.layers, parsed.gender, parsed.realKey, fit, true, imageBuffer.toString('base64'), keepKeys, hairColor);
         imageBase64 = generated.image;
         editedPhoto = generated.editedPhoto;
       } catch (regenErr) {
