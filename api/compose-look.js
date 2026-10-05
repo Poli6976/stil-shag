@@ -66,6 +66,9 @@ const { generateLookImageFlux, generateLookImageKontext, generateLookImageFlux2 
 
    Включается наличием FLUX_API_KEY: если ключа нет — как и раньше,
    используется YandexART (чистая генерация по тексту, без фото). */
+/* Возвращает { image: base64, editedPhoto: true|false } — editedPhoto говорит проверке картинки, можно ли
+   сравнивать результат с исходным фото (лицо/фигура): у YandexART картинка нарисована с нуля, и такое
+   сравнение браковало бы её всегда. */
 async function generateImage(layers, gender, realKey, fit, forceFraming, photoBase64, keepKeys) {
   if (process.env.FLUX_API_KEY && photoBase64) {
     var kontextPrompt = buildKontextEditPrompt(layers, gender, forceFraming, keepKeys);
@@ -75,16 +78,24 @@ async function generateImage(layers, gender, realKey, fit, forceFraming, photoBa
     try {
       var flux2Image = await generateLookImageFlux2(kontextPrompt, photoBase64);
       console.log('compose-look: генерация картинки — FLUX.2 [pro] (правка реального фото)');
-      return flux2Image;
+      return { image: flux2Image, editedPhoto: true };
     } catch (flux2Err) {
       console.error('compose-look: FLUX.2 не сработал, откат на Kontext:', flux2Err && flux2Err.message);
     }
-    console.log('compose-look: генерация картинки — Flux Kontext (правка реального фото)');
-    return await generateLookImageKontext(kontextPrompt, photoBase64);
+    /* 2026-10-05 — на BFL закончились кредиты ("402 Insufficient credits" у обеих моделей), и клиентка
+       получила "Не получилось собрать образ". Решение пользователя: в таком случае рисовать YandexART —
+       похожесть на фото хуже, но образ клиентка получит. */
+    try {
+      var kontextImage = await generateLookImageKontext(kontextPrompt, photoBase64);
+      console.log('compose-look: генерация картинки — Flux Kontext (правка реального фото)');
+      return { image: kontextImage, editedPhoto: true };
+    } catch (kontextErr) {
+      console.error('compose-look: Kontext не сработал, откат на YandexART:', kontextErr && kontextErr.message);
+    }
   }
-  console.log('compose-look: генерация картинки — YandexART fallback (нет FLUX_API_KEY или фото)');
+  console.log('compose-look: генерация картинки — YandexART (рисование с нуля, без правки фото)');
   var yandexPrompt = buildLookImagePrompt(layers, fit, null, gender, realKey, forceFraming);
-  return await generateLookImage(yandexPrompt);
+  return { image: await generateLookImage(yandexPrompt), editedPhoto: false };
 }
 
 /* Промпт для Flux Kontext — в отличие от buildLookImagePrompt (yandexart.js,
@@ -785,8 +796,9 @@ module.exports = async function handler(req, res) {
     }
     var keepKeys = keepLayerKeys(itemHint, parsed.layers, parsed.realKey);
     console.log('compose-look: слои —', JSON.stringify(parsed.layers), '| настоящая вещь:', JSON.stringify(keepKeys));
-    var usingKontext = !!process.env.FLUX_API_KEY;
-    var imageBase64 = await generateImage(parsed.layers, parsed.gender, parsed.realKey, fit, false, imageBuffer.toString('base64'), keepKeys);
+    var generated = await generateImage(parsed.layers, parsed.gender, parsed.realKey, fit, false, imageBuffer.toString('base64'), keepKeys);
+    var imageBase64 = generated.image;
+    var editedPhoto = generated.editedPhoto;
 
     /* 2026-09-16 — лог с прод-сервера подтвердил, что проверка реально ловит плохие картинки и
        перегенерирует (было видно "картинка не прошла проверку" в логах), но с одним повтором
@@ -804,7 +816,7 @@ module.exports = async function handler(req, res) {
     for (var attempt = 1; attempt <= IMAGE_MAX_ATTEMPTS; attempt++) {
       var failed;
       try {
-        failed = await imageFailedPoints(token, imageBase64, fit, parsed.layers, usingKontext ? fileId : null);
+        failed = await imageFailedPoints(token, imageBase64, fit, parsed.layers, editedPhoto ? fileId : null);
       } catch (imgVerifyErr) {
         console.error('compose-look: проверка картинки не удалась, используем лучшую из проверенных или текущую:', imgVerifyErr);
         if (!bestImage) bestImage = imageBase64;
@@ -818,7 +830,9 @@ module.exports = async function handler(req, res) {
       console.warn('compose-look: картинка не прошла проверку — перегенерирую (попытка ' +
         (attempt + 1) + ' из ' + IMAGE_MAX_ATTEMPTS + ')');
       try {
-        imageBase64 = await generateImage(parsed.layers, parsed.gender, parsed.realKey, fit, true, imageBuffer.toString('base64'), keepKeys);
+        generated = await generateImage(parsed.layers, parsed.gender, parsed.realKey, fit, true, imageBuffer.toString('base64'), keepKeys);
+        imageBase64 = generated.image;
+        editedPhoto = generated.editedPhoto;
       } catch (regenErr) {
         console.error('compose-look: перегенерация не удалась, берём лучшую из готовых:', regenErr);
         break;
