@@ -40,7 +40,7 @@ const { previewLookEntitlement, chargeForLook } = require('../lib/lookAccess');
 const { getAccessToken, uploadFile, chatWithImage } = require('../lib/gigachat');
 const { generateLookImage, buildLookImagePrompt, sizeToBodyPhrase, extractClothingSize } = require('../lib/yandexart');
 const { saveLook } = require('../lib/savedLooks');
-const { generateLookImageFlux, generateLookImageKontext } = require('../lib/flux');
+const { generateLookImageFlux, generateLookImageKontext, generateLookImageFlux2 } = require('../lib/flux');
 
 
 
@@ -68,9 +68,18 @@ const { generateLookImageFlux, generateLookImageKontext } = require('../lib/flux
    используется YandexART (чистая генерация по тексту, без фото). */
 async function generateImage(layers, gender, realKey, fit, forceFraming, photoBase64, keepKeys) {
   if (process.env.FLUX_API_KEY && photoBase64) {
-    console.log('compose-look: генерация картинки — Flux Kontext (правка реального фото)');
     var kontextPrompt = buildKontextEditPrompt(layers, gender, forceFraming, keepKeys);
-    console.log('compose-look: Kontext-промпт целиком —', kontextPrompt);
+    console.log('compose-look: промпт правки фото целиком —', kontextPrompt);
+    /* 2026-10-05 — сначала FLUX.2 [pro] (см. lib/flux.js), при любой его ошибке — прежний Kontext [pro],
+       чтобы новая модель не могла уронить сайт. Промпт тот же. */
+    try {
+      var flux2Image = await generateLookImageFlux2(kontextPrompt, photoBase64);
+      console.log('compose-look: генерация картинки — FLUX.2 [pro] (правка реального фото)');
+      return flux2Image;
+    } catch (flux2Err) {
+      console.error('compose-look: FLUX.2 не сработал, откат на Kontext:', flux2Err && flux2Err.message);
+    }
+    console.log('compose-look: генерация картинки — Flux Kontext (правка реального фото)');
     return await generateLookImageKontext(kontextPrompt, photoBase64);
   }
   console.log('compose-look: генерация картинки — YandexART fallback (нет FLUX_API_KEY или фото)');
@@ -483,13 +492,13 @@ function buildImageVerifyPrompt(bodyPhrase, layers, bothPhotos) {
     'пунктов через запятую> — <очень коротко, что не так>';
 }
 
-/* Возвращает true, если картинку стоит перегенерировать. Любая проблема на этом шаге (сеть, лимит,
-   странный ответ) НЕ должна ломать уже готовый результат — тогда просто считаем, что картинка сойдёт
-   как есть (мягкий отказ, тот же принцип, что и у самопроверки текста выше).
+/* Возвращает число невыполненных пунктов проверки (0 — картинка в порядке). Ошибки сети/лимита
+   бросаются наверх — handler тогда оставляет картинку как есть (мягкий отказ, тот же принцип, что и у
+   самопроверки текста выше).
    originalFileId — id уже загруженного в GigaChat фото клиентки (см. handler ниже, оно грузится один
    раз для разбора вещи и переиспользуется здесь) — передаётся только когда картинку рисовал Kontext,
    чтобы включить прямое сравнение с реальным фото вместо текстовой проверки размера. */
-async function imageNeedsRetry(token, imageBase64, fit, layers, originalFileId) {
+async function imageFailedPoints(token, imageBase64, fit, layers, originalFileId) {
   var verifyFileId = await uploadFile(token, Buffer.from(imageBase64, 'base64'), 'image/jpeg');
   var bothPhotos = !!originalFileId;
   var bodyPhrase = !bothPhotos && fit ? sizeToBodyPhrase(extractClothingSize(fit)) : null;
@@ -503,7 +512,12 @@ async function imageNeedsRetry(token, imageBase64, fit, layers, originalFileId) 
   /* 2026-10-05 — логи показали, что проверка браковала картинку во ВСЕХ запросах подряд (всегда 3
      генерации), а почему — не было видно. Логируем вердикт целиком: какой пункт не прошёл. */
   console.log('compose-look: вердикт проверки картинки —', verdict.trim().slice(0, 300));
-  return verdict.trim().toUpperCase().indexOf('OK') !== 0;
+  var text = verdict.trim();
+  if (text.toUpperCase().indexOf('OK') === 0) return 0;
+  /* "ПЕРЕСОБРАТЬ: 2,3 — ..." — считаем номера пунктов до тире; не разобрали — считаем один провал. */
+  var head = text.split(/[—–-]/)[0];
+  var nums = head.match(/\d+[а-яё]?/gi);
+  return nums && nums.length ? nums.length : 1;
 }
 
 /* Строку "эта же вещь"/"та же вещь" GigaChat иногда пишет вопреки прямому запрету в SYSTEM_PROMPT
@@ -765,19 +779,39 @@ module.exports = async function handler(req, res) {
        иногда не везёт дважды подряд — картинка так и остаётся плохой. IMAGE_MAX_ATTEMPTS поднят
        до 3 (первая попытка + до 2 повторов): цикл проверяет после каждой попытки, кроме
        последней (её всё равно покажем как есть, лишний запрос на проверку не нужен). */
+    /* 2026-10-05 — раньше последняя (третья) попытка показывалась БЕЗ проверки, и на живом тесте именно
+       она оказалась "полностью не той" (другой человек), хотя первые две тоже забраковали. Теперь
+       проверяется каждая попытка, включая последнюю, и клиентке уходит та, где меньше всего
+       невыполненных пунктов (при равенстве — более ранняя). Цена — ещё один вызов GigaChat, и только
+       когда дошло до третьей попытки. */
     var IMAGE_MAX_ATTEMPTS = 3;
-    for (var attempt = 1; attempt < IMAGE_MAX_ATTEMPTS; attempt++) {
+    var bestImage = null;
+    var bestFailed = Infinity;
+    for (var attempt = 1; attempt <= IMAGE_MAX_ATTEMPTS; attempt++) {
+      var failed;
       try {
-        var retryNeeded = await imageNeedsRetry(token, imageBase64, fit, parsed.layers, usingKontext ? fileId : null);
-        if (!retryNeeded) break;
-        console.warn('compose-look: картинка не прошла проверку — перегенерирую (попытка ' +
-          (attempt + 1) + ' из ' + IMAGE_MAX_ATTEMPTS + ')');
-        imageBase64 = await generateImage(parsed.layers, parsed.gender, parsed.realKey, fit, true, imageBuffer.toString('base64'), keepKeys);
+        failed = await imageFailedPoints(token, imageBase64, fit, parsed.layers, usingKontext ? fileId : null);
       } catch (imgVerifyErr) {
-        console.error('compose-look: проверка картинки не удалась, используем как есть:', imgVerifyErr);
+        console.error('compose-look: проверка картинки не удалась, используем лучшую из проверенных или текущую:', imgVerifyErr);
+        if (!bestImage) bestImage = imageBase64;
+        break;
+      }
+      if (failed < bestFailed) {
+        bestFailed = failed;
+        bestImage = imageBase64;
+      }
+      if (failed === 0 || attempt === IMAGE_MAX_ATTEMPTS) break;
+      console.warn('compose-look: картинка не прошла проверку — перегенерирую (попытка ' +
+        (attempt + 1) + ' из ' + IMAGE_MAX_ATTEMPTS + ')');
+      try {
+        imageBase64 = await generateImage(parsed.layers, parsed.gender, parsed.realKey, fit, true, imageBuffer.toString('base64'), keepKeys);
+      } catch (regenErr) {
+        console.error('compose-look: перегенерация не удалась, берём лучшую из готовых:', regenErr);
         break;
       }
     }
+    if (bestImage) imageBase64 = bestImage;
+    console.log('compose-look: показана картинка с невыполненными пунктами проверки:', bestFailed === Infinity ? 'не проверялась' : bestFailed);
 
     /* Списываем только сейчас, когда генерация реально удалась. Если это
        спишет неудачно (крайне редкая гонка — баланс успели потратить между
