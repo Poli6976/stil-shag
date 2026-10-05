@@ -580,6 +580,13 @@ function keepLayerKeys(itemHint, layers, realKey) {
   var keys = REAL_ITEM_LAYERS.filter(function (k) {
     return layers[k] && groups.some(function (re) { return re.test(layers[k]); });
   });
+  /* Платье честно занимает и "Верх", и "Низ". В остальных случаях настоящая вещь одна: подсказка "кофта"
+     совпадала и с "Верх: розовая кофта", и с придуманным "Верхняя одежда: длинный кардиган" (кардиган в
+     той же группе) — и кардиган не дорисовывался. При нескольких совпадениях берём слой, который GigaChat
+     сам отметил как "Реальная вещь", иначе первый. */
+  if (keys.length > 1 && !DRESS_RE.test(itemHint || '')) {
+    keys = keys.indexOf(realKey) !== -1 ? [realKey] : [keys[0]];
+  }
   if (!keys.length && realKey && REAL_ITEM_LAYERS.indexOf(realKey) !== -1) keys = [realKey];
   return keys;
 }
