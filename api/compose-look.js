@@ -66,10 +66,10 @@ const { generateLookImageFlux, generateLookImageKontext } = require('../lib/flux
 
    Включается наличием FLUX_API_KEY: если ключа нет — как и раньше,
    используется YandexART (чистая генерация по тексту, без фото). */
-async function generateImage(layers, gender, realKey, fit, forceFraming, photoBase64) {
+async function generateImage(layers, gender, realKey, fit, forceFraming, photoBase64, keepKeys) {
   if (process.env.FLUX_API_KEY && photoBase64) {
     console.log('compose-look: генерация картинки — Flux Kontext (правка реального фото)');
-    var kontextPrompt = buildKontextEditPrompt(layers, gender, forceFraming);
+    var kontextPrompt = buildKontextEditPrompt(layers, gender, forceFraming, keepKeys);
     console.log('compose-look: Kontext-промпт целиком —', kontextPrompt);
     return await generateLookImageKontext(kontextPrompt, photoBase64);
   }
@@ -141,15 +141,32 @@ async function generateImage(layers, gender, realKey, fit, forceFraming, photoBa
    копирования конкретного тела с фото. Убираю категорийные слова совсем —
    вместо них прямая команда "не меняй" без привязки к размерной шкале,
    опора на само фото, а не на текстовое описание фигуры. */
-function buildKontextEditPrompt(layers, gender, forceFraming) {
+/* 2026-10-05 — keepKeys: слои, где лежит НАСТОЯЩАЯ вещь клиентки (см. keepLayerKeys). Раньше и для неё
+   шла команда "Замени верх на: белая кофта" — Kontext перерисовывал вещь по тексту и терял крой (живой тест:
+   кофта стала рубашкой с воротником, несмотря на отдельное предложение про кофту/рубашку ниже). Вещь уже
+   есть на фото — её не нужно заменять, достаточно велеть оставить как есть. */
+var KEEP_SENTENCE = {
+  'Верх': 'Верх (то, что надето выше пояса) оставь точно таким же, как на исходном фото: тот же фасон, крой, цвет, ткань и детали — эту вещь не меняй.',
+  'Низ': 'Низ (то, что надето ниже пояса) оставь точно таким же, как на исходном фото: тот же фасон, длина, крой, цвет и ткань — эту вещь не меняй.',
+  'Верхняя одежда': 'Верхнюю одежду (то, что надето поверх) оставь точно такой же, как на исходном фото — эту вещь не меняй.'
+};
+
+function buildKontextEditPrompt(layers, gender, forceFraming, keepKeys) {
+  keepKeys = keepKeys || [];
   var sentences = [];
-  if (layers['Верх']) {
+  if (keepKeys.indexOf('Верх') !== -1) {
+    sentences.push(KEEP_SENTENCE['Верх']);
+  } else if (layers['Верх']) {
     sentences.push('Замени верх (то, что надето выше пояса) на: ' + layers['Верх'] + '.');
   }
-  if (layers['Низ']) {
+  if (keepKeys.indexOf('Низ') !== -1) {
+    sentences.push(KEEP_SENTENCE['Низ']);
+  } else if (layers['Низ']) {
     sentences.push('Замени низ (то, что надето ниже пояса) на: ' + layers['Низ'] + '.');
   }
-  if (layers['Верхняя одежда']) {
+  if (keepKeys.indexOf('Верхняя одежда') !== -1) {
+    sentences.push(KEEP_SENTENCE['Верхняя одежда']);
+  } else if (layers['Верхняя одежда']) {
     /* 2026-09-30 — живые тесты: на "чёрный укороченный жакет" и "графитовый блейзер" Kontext нарисовал
        длинную вещь до колена/середины бедра — со стороны читается как пальто, не как жакет. Слово
        "укороченный"/тип вещи он не выдерживает — называем длину конкретно (уровень бёдер), только для
@@ -487,10 +504,44 @@ async function imageNeedsRetry(token, imageBase64, fit, layers, originalFileId) 
 var SAME_ITEM_PREFIX_RE = /^(эта|та)\s+же\s+вещь\.?\s*[:.,]?\s*/i;
 
 var DRESS_RE = /плать|сарафан|комбинезон/i;
+var BOTTOM_HINT_RE = /юбк|брюк|штан|джинс|шорт|кюлот|палаццо/i;
 
-/* true, если пользователь назвал платье/сарафан/комбинезон, а ни в "Верх", ни в "Низ" такого слова нет. */
-function dressLost(itemHint, layers) {
-  return DRESS_RE.test(itemHint || '') && !DRESS_RE.test((layers['Верх'] || '') + ' ' + (layers['Низ'] || ''));
+/* Типы вещей из подсказки пользователя. Синонимы внутри группы взаимозаменяемы (подсказка "брюки" —
+   "джинсы" в ответе не ошибка), между группами — нет ("юбка" → "брюки" ошибка). 2026-10-05: страховка
+   была только для платья, а та же поломка случилась с юбкой — GigaChat не вернул "Низ", подставились
+   запасные брюки из FALLBACK_BOTTOM. */
+var ITEM_TYPE_GROUPS = [
+  /плать|сарафан|комбинезон/i,
+  /юбк/i,
+  /брюк|штан|джинс|кюлот|палаццо/i,
+  /шорт/i,
+  /кофт|свитер|джемпер|пуловер|водолазк|свитшот|худи|кардиган/i,
+  /рубаш|блуз/i,
+  /футболк|майк|лонгслив|топ(?![а-яё])/i,
+  /куртк|пиджак|жакет|блейзер|пальто|тренч|плащ|ветровк|бомбер|кардиган/i
+];
+var REAL_ITEM_LAYERS = ['Верх', 'Низ', 'Верхняя одежда'];
+
+function hintTypeGroups(itemHint) {
+  return ITEM_TYPE_GROUPS.filter(function (re) { return re.test(itemHint || ''); });
+}
+
+/* true, если пользователь назвал тип вещи, а ни в одном из слоёв одежды такого типа нет. */
+function hintTypeLost(itemHint, layers) {
+  var groups = hintTypeGroups(itemHint);
+  if (!groups.length) return false;
+  var text = REAL_ITEM_LAYERS.map(function (k) { return layers[k] || ''; }).join(' ');
+  return !groups.some(function (re) { return re.test(text); });
+}
+
+/* Слои, где лежит настоящая вещь с фото: по подсказке пользователя (надёжнее), иначе по "Реальная вещь". */
+function keepLayerKeys(itemHint, layers, realKey) {
+  var groups = hintTypeGroups(itemHint);
+  var keys = REAL_ITEM_LAYERS.filter(function (k) {
+    return layers[k] && groups.some(function (re) { return re.test(layers[k]); });
+  });
+  if (!keys.length && realKey && REAL_ITEM_LAYERS.indexOf(realKey) !== -1) keys = [realKey];
+  return keys;
 }
 
 function parseLayers(text) {
@@ -642,18 +693,19 @@ module.exports = async function handler(req, res) {
        (SYSTEM_PROMPT) и пункт 9 самопроверки этого не удержали — по урокам этого файла для такого случая
        нужна проверка в коде: если подсказка называет платье/сарафан/комбинезон, а в "Верх"/"Низ" такого
        слова нет — один повторный запрос с прямой командой, без запасных вариантов вместо самой вещи. */
-    if (dressLost(itemHint, parsed.layers)) {
-      console.warn('compose-look: платье из уточнения пропало из слоёв «Верх»/«Низ» — повторный запрос с прямой командой');
+    if (hintTypeLost(itemHint, parsed.layers)) {
+      console.warn('compose-look: вещь из уточнения («' + itemHint + '») пропала из слоёв — повторный запрос с прямой командой');
       try {
         var repairRaw = await chatWithImage(token, SYSTEM_PROMPT, userText +
-          ' ВАЖНО, исправление прошлого ответа: на фото надето ПЛАТЬЕ (сарафан/комбинезон), а в слоях оно потерялось. ' +
-          'ОБЕ строки "Верх" и "Низ" должны описывать именно это платье по фото (цвет, узор, крой, длина, рукав) — ' +
-          'никакой блузки, рубашки, юбки или брюк вместо него. Строка "Реальная вещь: Верх". Остальные слои ' +
-          '(верхняя одежда, обувь, аксессуары, причёска, макияж) придумай под это платье и повод.', fileId);
+          ' ВАЖНО, исправление прошлого ответа: пользователь уточнил, что настоящая вещь на фото — «' + itemHint +
+          '», а в слоях её нет. Опиши именно эту вещь по фото (тип — как в уточнении, плюс цвет, узор, крой, длина) ' +
+          'в её слое: платье/сарафан/комбинезон — в ОБЕИХ строках "Верх" и "Низ"; юбка/брюки/джинсы/шорты — в "Низ"; ' +
+          'кофта/свитер/рубашка/блузка/футболка/топ — в "Верх"; куртка/пиджак/пальто, надетые поверх, — в "Верхняя ' +
+          'одежда". Отметь этот слой в строке "Реальная вещь". Остальные слои придумай под эту вещь и повод.', fileId);
         var repaired = parseLayers(repairRaw);
-        if (!dressLost(itemHint, repaired.layers)) parsed = repaired;
+        if (!hintTypeLost(itemHint, repaired.layers)) parsed = repaired;
       } catch (repairErr) {
-        console.error('compose-look: повторный запрос про платье не удался, используем первый ответ:', repairErr);
+        console.error('compose-look: повторный запрос про вещь из уточнения не удался, используем первый ответ:', repairErr);
       }
     }
     /* Платье закрывает обе роли: если платье есть только в одной из строк "Верх"/"Низ" — копируем его описание
@@ -673,12 +725,19 @@ module.exports = async function handler(req, res) {
     }
 
     if (!parsed.layers['Низ']) {
-      var fallbackOccasion = OCCASION_LABELS[body.occasion] ? body.occasion : '';
-      parsed.layers['Низ'] = FALLBACK_BOTTOM[fallbackOccasion];
-      console.warn('compose-look: GigaChat пропустил слой "Низ" (повод: ' + (body.occasion || 'не указан') + ') — подставлен запасной вариант');
+      if (BOTTOM_HINT_RE.test(itemHint)) {
+        /* Пользователь сам назвал свой низ — запасные брюки/юбка под повод были бы другой вещью. */
+        parsed.layers['Низ'] = itemHint;
+        console.warn('compose-look: GigaChat пропустил слой "Низ" — подставлено уточнение пользователя');
+      } else {
+        var fallbackOccasion = OCCASION_LABELS[body.occasion] ? body.occasion : '';
+        parsed.layers['Низ'] = FALLBACK_BOTTOM[fallbackOccasion];
+        console.warn('compose-look: GigaChat пропустил слой "Низ" (повод: ' + (body.occasion || 'не указан') + ') — подставлен запасной вариант');
+      }
     }
+    var keepKeys = keepLayerKeys(itemHint, parsed.layers, parsed.realKey);
     var usingKontext = !!process.env.FLUX_API_KEY;
-    var imageBase64 = await generateImage(parsed.layers, parsed.gender, parsed.realKey, fit, false, imageBuffer.toString('base64'));
+    var imageBase64 = await generateImage(parsed.layers, parsed.gender, parsed.realKey, fit, false, imageBuffer.toString('base64'), keepKeys);
 
     /* 2026-09-16 — лог с прод-сервера подтвердил, что проверка реально ловит плохие картинки и
        перегенерирует (было видно "картинка не прошла проверку" в логах), но с одним повтором
@@ -692,7 +751,7 @@ module.exports = async function handler(req, res) {
         if (!retryNeeded) break;
         console.warn('compose-look: картинка не прошла проверку (фигура/кадр обрезан) — перегенерирую (попытка ' +
           (attempt + 1) + ' из ' + IMAGE_MAX_ATTEMPTS + ')');
-        imageBase64 = await generateImage(parsed.layers, parsed.gender, parsed.realKey, fit, true, imageBuffer.toString('base64'));
+        imageBase64 = await generateImage(parsed.layers, parsed.gender, parsed.realKey, fit, true, imageBuffer.toString('base64'), keepKeys);
       } catch (imgVerifyErr) {
         console.error('compose-look: проверка картинки не удалась, используем как есть:', imgVerifyErr);
         break;
