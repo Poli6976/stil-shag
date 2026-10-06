@@ -3,8 +3,10 @@
    ответов, без вызова языковой модели (это и держит цену низкой). Слой «Верх» —
    исключение: реальное описание вещи с фото пользователя, полученное через GigaChat на
    предыдущем шаге (api/analyze-item.js) и подставленное сюда через applyItemToLayers.
-   Результат текстовый, без иллюстрации — рисованный референс образа собирает отдельный,
-   более дорогой продукт («Онлайн-стилист», api/compose-look.js). */
+   2026-10-06 — добавлены карточка цветотипа (шаг "colors": 3 вопроса → палитра «идёт / лучше
+   избегать», считается здесь же правилами, без ИИ) и снова картинка: рисованная модель ТИПАЖА
+   клиентки (цвет волос из анкеты, фигура по размеру) — api/looks/charge.js. Образ на её
+   собственном фото — отдельный продукт («Онлайн-стилист», api/compose-look.js). */
 
 (function () {
   var STEPS = [
@@ -63,6 +65,14 @@
       question: 'Рост и размер — если готовы поделиться',
       placeholder: 'Например: 165 см, 44 размер',
       hint: 'Не обязательно для результата — можно оставить пустым.'
+    },
+    {
+      id: 'colors',
+      type: 'colortype',
+      eyebrow: 'Вопрос 6',
+      question: 'Пара вопросов про цвет',
+      hint: 'По ответам подберём вашу палитру — какие оттенки вам идут и каких лучше избегать. ' +
+        'Цвет волос нужен ещё и для картинки: нарисованная модель будет вашего типажа.'
     },
     {
       id: 'style',
@@ -307,6 +317,161 @@
     return result;
   }
 
+  /* ---------- карточка цветотипа (шаг "colors") ----------
+     Три вопроса вместо фото лица — в этом продукте человека на фото нет, только вещь. Подтон
+     (тёплый/холодный) — по металлу и реакции кожи на солнце (самые надёжные бытовые признаки),
+     глубина (светлый/тёмный) — по цвету волос. Четыре классических типа + нейтральный, если
+     признаки не указывают ни в одну сторону.
+     Списки «избегать» специально не содержат белый, тёмно-синий и индиго — эти цвета есть в
+     шаблонах образов выше (TEMPLATES), и карточка не должна противоречить самому образу.
+     Значения hair уходят в api/looks/charge.js (HAIR_PHRASES) — менять ключи только вместе. */
+  var COLOR_QUESTIONS = [
+    {
+      id: 'hair',
+      question: 'Какой у вас цвет волос?',
+      options: [
+        { value: 'blond', label: 'Блонд' },
+        { value: 'light_brown', label: 'Русый' },
+        { value: 'brown', label: 'Каштановый' },
+        { value: 'dark', label: 'Тёмный' },
+        { value: 'red', label: 'Рыжий' },
+        { value: 'grey', label: 'Седой' }
+      ]
+    },
+    {
+      id: 'metal',
+      question: 'Что вам больше идёт — золото или серебро?',
+      hint: 'Украшения, часы, оправа очков — что смотрится на вас лучше.',
+      options: [
+        { value: 'gold', label: 'Золото' },
+        { value: 'silver', label: 'Серебро' },
+        { value: 'both', label: 'И то и другое' },
+        { value: 'unknown', label: 'Не знаю' }
+      ]
+    },
+    {
+      id: 'sun',
+      question: 'Как кожа реагирует на солнце?',
+      options: [
+        { value: 'tan', label: 'Быстро загораю' },
+        { value: 'burn', label: 'Скорее обгораю' },
+        { value: 'unknown', label: 'Не знаю' }
+      ]
+    }
+  ];
+
+  var COLOR_TYPES = {
+    spring: {
+      title: 'Тёплый светлый тип («весна»)',
+      note: 'Вам идут тёплые, чистые и светлые оттенки — как будто подсвеченные солнцем.',
+      suits: [
+        { name: 'персиковый', hex: '#f4a582' },
+        { name: 'коралловый', hex: '#f08070' },
+        { name: 'тёплый молочный', hex: '#f5ecd7' },
+        { name: 'светлый кэмел', hex: '#c9a06b' },
+        { name: 'золотисто-жёлтый', hex: '#e8c547' },
+        { name: 'салатовый', hex: '#9cc56b' },
+        { name: 'бирюзовый', hex: '#3fb8af' },
+        { name: 'светло-коричневый', hex: '#a47551' }
+      ],
+      avoid: [
+        { name: 'холодный серый', hex: '#9aa0a6' },
+        { name: 'фуксия', hex: '#c2185b' },
+        { name: 'тёмно-сливовый', hex: '#5e2750' }
+      ]
+    },
+    autumn: {
+      title: 'Тёплый глубокий тип («осень»)',
+      note: 'Вам идут тёплые, насыщенные, «природные» оттенки — пряные и землистые.',
+      suits: [
+        { name: 'терракотовый', hex: '#c1663f' },
+        { name: 'горчичный', hex: '#c9a227' },
+        { name: 'оливковый', hex: '#6b7a3a' },
+        { name: 'шоколадный', hex: '#5c3a21' },
+        { name: 'кирпичный', hex: '#9c3d2e' },
+        { name: 'тёмно-зелёный', hex: '#2f4f3a' },
+        { name: 'кэмел', hex: '#b9864c' },
+        { name: 'тёплый молочный', hex: '#efe3cc' }
+      ],
+      avoid: [
+        { name: 'ледяной розовый', hex: '#f4c6d7' },
+        { name: 'фуксия', hex: '#c2185b' },
+        { name: 'холодный голубой', hex: '#9fc9e8' }
+      ]
+    },
+    summer: {
+      title: 'Холодный светлый тип («лето»)',
+      note: 'Вам идут холодные, мягкие, чуть приглушённые оттенки — без резкого контраста.',
+      suits: [
+        { name: 'пыльная роза', hex: '#d4a5a5' },
+        { name: 'лавандовый', hex: '#b9a7d1' },
+        { name: 'серо-голубой', hex: '#8fa9c2' },
+        { name: 'мятный', hex: '#a8d5c2' },
+        { name: 'сливовый', hex: '#7b4f6e' },
+        { name: 'холодный серый', hex: '#8e9aa6' },
+        { name: 'морская волна', hex: '#4f8a8b' },
+        { name: 'приглушённый малиновый', hex: '#b5476b' }
+      ],
+      avoid: [
+        { name: 'оранжевый', hex: '#e8772e' },
+        { name: 'горчичный', hex: '#c9a227' },
+        { name: 'рыжевато-коричневый', hex: '#9a5b2e' }
+      ]
+    },
+    winter: {
+      title: 'Холодный контрастный тип («зима»)',
+      note: 'Вам идут холодные, чистые и насыщенные оттенки и контраст светлого с тёмным.',
+      suits: [
+        { name: 'изумрудный', hex: '#0f7b5f' },
+        { name: 'бордовый', hex: '#7b1e2e' },
+        { name: 'сапфировый', hex: '#1f3f8c' },
+        { name: 'фуксия', hex: '#c2185b' },
+        { name: 'чисто-белый', hex: '#ffffff' },
+        { name: 'чёрный', hex: '#111111' },
+        { name: 'ледяной розовый', hex: '#f4d6e4' },
+        { name: 'графитовый', hex: '#3a3d42' }
+      ],
+      avoid: [
+        { name: 'персиковый', hex: '#f4b183' },
+        { name: 'горчичный', hex: '#c9a227' },
+        { name: 'тёплый бежевый', hex: '#d8c3a0' }
+      ]
+    },
+    neutral: {
+      title: 'Нейтральный тип',
+      note: 'По ответам подтон не выражен — вам подойдут мягкие оттенки без явного тепла или холода. ' +
+        'Если знаете, что вам больше идёт золото или серебро, ответьте так — палитра станет точнее.',
+      suits: [
+        { name: 'серо-бежевый (тауп)', hex: '#a39382' },
+        { name: 'приглушённый бирюзовый', hex: '#4a8c8c' },
+        { name: 'пыльная роза', hex: '#d4a5a5' },
+        { name: 'мягкий белый', hex: '#f2efea' },
+        { name: 'шалфейный', hex: '#9caf88' },
+        { name: 'графитовый', hex: '#3a3d42' },
+        { name: 'приглушённый бордовый', hex: '#8a3b4a' },
+        { name: 'мягкий синий', hex: '#4a6fa5' }
+      ],
+      avoid: [
+        { name: 'неоновые оттенки', hex: '#c6ff00' },
+        { name: 'ярко-оранжевый', hex: '#ff6a00' }
+      ]
+    }
+  };
+
+  function computeColorType(ans) {
+    var warmth = 0;
+    if (ans.metal === 'gold') warmth += 2;
+    if (ans.metal === 'silver') warmth -= 2;
+    if (ans.sun === 'tan') warmth += 1;
+    if (ans.sun === 'burn') warmth -= 1;
+    if (ans.hair === 'red') warmth += 2;
+    if (ans.hair === 'grey') warmth -= 1;
+    var deep = ans.hair === 'brown' || ans.hair === 'dark';
+    if (warmth > 0) return COLOR_TYPES[deep ? 'autumn' : 'spring'];
+    if (warmth < 0) return COLOR_TYPES[deep ? 'winter' : 'summer'];
+    return COLOR_TYPES.neutral;
+  }
+
   var BUDGET_LABELS = {
     low: 'до 3 000 ₽',
     mid: '3 000–8 000 ₽',
@@ -369,11 +534,11 @@
      без кодов партнёра — см. chargeForObrazPoFoto в lib/lookAccess.js) и
      только при успехе показывает результат. Слои считаются заранее из
      статичных шаблонов (бесплатно для нас) и уходят на сервер вместе со
-     списанием — там только сохраняются в «Мои образы» текстом, без картинки
-     (api/looks/charge.js). */
+     списанием — там по ним рисуется модель типажа клиентки (цвет волос из
+     анкеты) и всё сохраняется в «Мои образы» (api/looks/charge.js). */
   function chargeAndRenderResult() {
     root.innerHTML = '';
-    root.appendChild(el('p', 'wizard-step__hint', 'Оформляем ваш образ…'));
+    root.appendChild(el('p', 'wizard-step__hint', 'Собираем и рисуем ваш образ — это займёт до минуты…'));
 
     var built = buildTemplateResult();
 
@@ -387,7 +552,8 @@
         layers: built.layers,
         why: built.tpl.why,
         fit: answers.fit || '',
-        gender: built.isMale ? 'male' : 'female'
+        gender: built.isMale ? 'male' : 'female',
+        hair: answers.hair || ''
       })
     })
       .then(function (res) {
@@ -400,8 +566,8 @@
         }
         return res.json();
       })
-      .then(function () {
-        renderResult(built);
+      .then(function (data) {
+        renderResult(built, data && data.image);
       })
       .catch(function (err) {
         root.innerHTML = '';
@@ -609,6 +775,35 @@
       root.appendChild(optWrap);
 
       canAdvance = !!answers[step.id];
+    } else if (step.type === 'colortype') {
+      root.appendChild(el('span', 'wizard-step__eyebrow', step.eyebrow));
+      root.appendChild(el('h2', null, step.question));
+      if (step.hint) root.appendChild(el('p', 'wizard-step__hint', step.hint));
+
+      COLOR_QUESTIONS.forEach(function (q) {
+        var subq = el('h3', 'wizard-subq');
+        subq.textContent = q.question;
+        root.appendChild(subq);
+        if (q.hint) {
+          var subHint = el('p', 'wizard-step__hint');
+          subHint.textContent = q.hint;
+          root.appendChild(subHint);
+        }
+        var qWrap = el('div', 'wizard-options wizard-options--compact');
+        q.options.forEach(function (opt) {
+          var qBtn = el('button', 'wizard-option' + (answers[q.id] === opt.value ? ' is-selected' : ''));
+          qBtn.type = 'button';
+          qBtn.textContent = opt.label;
+          qBtn.addEventListener('click', function () {
+            answers[q.id] = opt.value;
+            render();
+          });
+          qWrap.appendChild(qBtn);
+        });
+        root.appendChild(qWrap);
+      });
+
+      canAdvance = COLOR_QUESTIONS.every(function (q) { return !!answers[q.id]; });
     } else if (step.type === 'text') {
       root.appendChild(el('span', 'wizard-step__eyebrow', step.eyebrow));
       root.appendChild(el('h2', null, step.question));
@@ -693,7 +888,7 @@
     } catch (e) {}
   }
 
-  function renderResult(built) {
+  function renderResult(built, image) {
     bumpStyleCount();
 
     progressLabel.textContent = 'Готово';
@@ -709,9 +904,21 @@
     var itemNote = answers.item ? 'Вещь: «' + escapeHtml(answers.item) + '». ' : '';
     root.appendChild(el('p', 'wizard-result__note',
       itemNote + 'Слой «Верх» — ваша вещь с фото, остальные слои алгоритм подобрал под повод «' +
-      tpl.title.toLowerCase() + '» и ваши ответы. Без иллюстрации: рисованный референс образа — ' +
-      'на «Онлайн-стилисте», отдельным продуктом.'
+      tpl.title.toLowerCase() + '» и ваши ответы. Образ прямо на вашем собственном фото — на ' +
+      '«Онлайн-стилисте», отдельным продуктом.'
     ));
+
+    if (image) {
+      var imageNote = el('p', 'wizard-result__note');
+      imageNote.textContent = 'Картинка — рисованная модель вашего типажа (цвет волос и фигура — по вашим ' +
+        'ответам), а не вы и не фотография вашей вещи. Это ориентир, как может выглядеть образ целиком.';
+      root.appendChild(imageNote);
+      var img = document.createElement('img');
+      img.className = 'wizard-result-image';
+      img.src = image;
+      img.alt = 'Рисованная модель в собранном образе';
+      root.appendChild(img);
+    }
 
     var layersBlock = el('div', 'wizard-result__block');
     layersBlock.appendChild(el('div', 'wizard-result__block-title', '👕 Образ по слоям'));
@@ -727,6 +934,8 @@
     whyBlock.appendChild(el('div', 'wizard-result__block-title', '💡 Почему именно так'));
     whyBlock.appendChild(el('p', 'wizard-why', tpl.why));
     root.appendChild(whyBlock);
+
+    renderColorCard(computeColorType(answers));
 
     var productsBlock = el('div', 'wizard-result__block');
     productsBlock.appendChild(el('div', 'wizard-result__block-title', '🛍 Что докупить · бюджет ' + (BUDGET_LABELS[answers.budget] || 'не указан')));
@@ -745,6 +954,50 @@
     root.appendChild(productsBlock);
 
     renderRestartLinks();
+  }
+
+  /* Тексты и цвета — из констант COLOR_TYPES выше, не из ввода клиента; всё равно через
+     textContent/style, без innerHTML. */
+  function renderColorCard(type) {
+    var block = el('div', 'wizard-result__block');
+    block.appendChild(el('div', 'wizard-result__block-title', '🎨 Ваши цвета'));
+
+    var typeTitle = el('p', 'wizard-colortype__title');
+    typeTitle.textContent = type.title;
+    block.appendChild(typeTitle);
+    var typeNote = el('p', 'wizard-result__note');
+    typeNote.textContent = type.note;
+    block.appendChild(typeNote);
+
+    function swatchList(label, colors) {
+      var heading = el('div', 'wizard-colortype__label');
+      heading.textContent = label;
+      block.appendChild(heading);
+      var list = el('ul', 'wizard-palette');
+      colors.forEach(function (c) {
+        var li = el('li', 'wizard-palette__item');
+        var dot = el('span', 'wizard-palette__dot');
+        dot.style.background = c.hex;
+        var name = el('span', 'wizard-palette__name');
+        name.textContent = c.name;
+        li.appendChild(dot);
+        li.appendChild(name);
+        list.appendChild(li);
+      });
+      block.appendChild(list);
+    }
+    swatchList('Идут вам', type.suits);
+    swatchList('Лучше избегать у лица', type.avoid);
+
+    var tip = el('p', 'wizard-result__note');
+    tip.textContent = 'Если ваша вещь — в цвете из второго списка, это не беда: носите её подальше от лица ' +
+      '(низ, обувь), а у лица — цвет из своей палитры.';
+    block.appendChild(tip);
+    var disclaimer = el('p', 'wizard-colortype__disclaimer');
+    disclaimer.textContent = 'Подсказка по вашим ответам — ориентир для выбора цвета, а не заключение стилиста.';
+    block.appendChild(disclaimer);
+
+    root.appendChild(block);
   }
 
   function renderRestartLinks() {

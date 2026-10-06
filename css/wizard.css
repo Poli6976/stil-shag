@@ -434,6 +434,75 @@
   margin: 0;
 }
 
+/* ---------- шаг "Пара вопросов про цвет" и карточка цветотипа ---------- */
+.wizard-subq {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 1.15rem;
+  color: var(--text-primary);
+  margin: 28px 0 12px;
+}
+
+.wizard-options--compact {
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.wizard-options--compact .wizard-option {
+  padding: 14px 16px;
+  font-size: 0.95rem;
+}
+
+.wizard-colortype__title {
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  color: var(--accent-gold-ink);
+  margin: 0 0 6px;
+}
+
+.wizard-colortype__label {
+  font-family: var(--font-body);
+  font-size: 0.82rem;
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin: 4px 0 12px;
+}
+
+.wizard-palette {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 24px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 18px;
+}
+
+.wizard-palette__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-body);
+  font-size: 0.92rem;
+  color: var(--text-primary);
+}
+
+.wizard-palette__dot {
+  width: 26px;
+  height: 26px;
+  flex: 0 0 26px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+}
+
+.wizard-colortype__disclaimer {
+  font-family: var(--font-body);
+  font-size: 0.8rem;
+  font-style: italic;
+  color: var(--text-faint);
+  margin: 0;
+}
+
 .wizard-restart {
   text-align: center;
   margin-top: clamp(32px, 6vw, 48px);
@@ -444,6 +513,10 @@
   .wizard-options,
   .wizard-products {
     grid-template-columns: 1fr;
+  }
+
+  .wizard-options--compact {
+    grid-template-columns: 1fr 1fr;
   }
 
   .wizard-layers {
