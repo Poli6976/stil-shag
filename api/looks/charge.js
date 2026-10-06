@@ -26,6 +26,7 @@
 const { requireUser } = require('../../lib/auth');
 const { previewObrazPoFotoEntitlement, chargeForObrazPoFoto } = require('../../lib/lookAccess');
 const { generateLookImage, buildLookImagePrompt } = require('../../lib/yandexart');
+const { getAccessToken, uploadFile, chatWithImage } = require('../../lib/gigachat');
 const { saveLook } = require('../../lib/savedLooks');
 
 /* Цвет волос из анкеты (js/wizard.js, шаг "colors") — только из этого списка, свободный текст
@@ -57,26 +58,80 @@ function unescapeHtml(str) {
   return str.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&');
 }
 
+/* Вещь клиентки приходит обёрнутой ("Уже есть — это ваша вещь: «...»", js/wizard.js) — укорачиваем
+   только текст внутри кавычек, обёртку оставляем: по ней lib/yandexart.js узнаёт главную вещь. */
+var WRAPPED_ITEM_RE = /^(Уже есть — это ваша вещь: «)(.*)(».*)$/;
+function shortenItemForImage(value) {
+  var m = WRAPPED_ITEM_RE.exec(value);
+  if (!m) return value;
+  var text = m[2].split(/\.\s/)[0].replace(/\.$/, '');
+  if (text.length > 60) text = text.slice(0, 60).replace(/[\s,]+\S*$/, '');
+  return m[1] + text + m[3];
+}
+
+/* 2026-10-06 — живой тест: картинка обрезана по бедро. Обувь из картинки убрана с 2026-09-15 (там
+   обувь описывал GigaChat и её цвет/тип часто не совпадал), и внизу кадра модели нечего рисовать.
+   Здесь обувь — короткая строка шаблона ("Белые кроссовки или лоферы"), её возвращаем в картинку
+   ТОЛЬКО для этого продукта; в api/compose-look.js решение 2026-09-15 не меняется. */
+const IMAGE_SKIP_KEYS = ['Макияж', 'Уход', 'Аксессуары'];
+
+/* Та же проверка кадра, что работала в api/compose-look.js для YandexART (2026-09-16), но один пункт
+   и одна перерисовка — продукт дешёвый. */
+const FRAMING_CHECK_PROMPT =
+  'Ты — контролёр качества fashion-иллюстрации. Тебе показана рисованная картинка. Видна ли вся фигура ' +
+  'человека от макушки до стоп — ноги и обувь целиком в кадре, картинка НЕ обрезана на бёдрах, коленях ' +
+  'или голенях? Если да — ответь СТРОГО одним словом без знаков препинания: OK. Если нет — ответь: ОБРЕЗАНО';
+
+async function framingOk(imageBase64) {
+  if (!process.env.GIGACHAT_AUTH_KEY) return true;
+  var token = await getAccessToken();
+  var fileId = await uploadFile(token, Buffer.from(imageBase64, 'base64'), 'image/jpeg');
+  var verdict = (await chatWithImage(token, FRAMING_CHECK_PROMPT, 'Проверь картинку.', fileId)).trim();
+  console.log('looks/charge: проверка кадра —', verdict.slice(0, 100));
+  return verdict.toUpperCase().indexOf('OK') === 0;
+}
+
 async function tryGenerateImage(layers, fit, gender, hair) {
   if (!process.env.YANDEX_API_KEY || !process.env.YANDEX_FOLDER_ID) return null;
   if (!Object.keys(layers).length) return null;
-  var imageLayers = {};
-  Object.keys(layers).forEach(function (k) { imageLayers[k] = unescapeHtml(layers[k]); });
   /* Цвет волос ставим в начало слоя "Причёска": в промпте слой обрезается до ~36 символов
      (lib/yandexart.js, TEMPLATE_LAYER_MAX_WITH_ITEM), и так цвет переживёт обрезку. Отдельной
      фразой в гарантированную часть промпта НЕ добавляем — по истории yandexart.js любая добавка
-     туда вытесняет "Низ". */
+     туда вытесняет "Низ". "Причёску" кладём раньше "Обуви": при нехватке места buildLookImagePrompt
+     отбрасывает слои с конца, и цвет волос важнее обуви. */
+  /* Бюджет промпта ~460 символов (lib/yandexart.js) — проверено node -e на "куртка + размер 62":
+     полное описание вещи от GigaChat (2-4 предложения) и строки шаблона целиком вытесняли волосы и
+     обувь. Поэтому для картинки: вещь — первая фраза до ~60 символов, причёска — только цвет волос
+     (укладка остаётся в тексте карточки), обувь — до первого " — "/" или "/запятой. */
   var hairPhrase = HAIR_PHRASES[hair];
-  if (hairPhrase) {
-    imageLayers['Причёска'] = hairPhrase + (imageLayers['Причёска'] ? ', ' + imageLayers['Причёска'].toLowerCase() : '');
-  }
+  var imageLayers = {};
+  Object.keys(layers).forEach(function (k) {
+    if (k === 'Обувь' || k === 'Причёска') return;
+    imageLayers[k] = shortenItemForImage(unescapeHtml(layers[k]));
+  });
+  if (hairPhrase) imageLayers['Причёска'] = hairPhrase;
+  else if (layers['Причёска']) imageLayers['Причёска'] = unescapeHtml(layers['Причёска']);
+  if (layers['Обувь']) imageLayers['Обувь'] = unescapeHtml(layers['Обувь']).split(/ — |,| или /)[0];
+
+  var prompt = buildLookImagePrompt(imageLayers, fit, IMAGE_SKIP_KEYS, gender);
+  var image;
   try {
-    var prompt = buildLookImagePrompt(imageLayers, fit, null, gender);
     console.log('looks/charge: промпт картинки —', prompt);
-    return await generateLookImage(prompt);
+    image = await generateLookImage(prompt);
   } catch (err) {
     console.error('looks/charge: не удалось сгенерировать картинку:', err);
     return null;
+  }
+  /* Перерисовка — тем же промптом, без forceFraming: его длинная фраза про дальний план съедает весь
+     "Остальной образ" (проверено node -e — пропадали даже джинсы). Новая случайная генерация и так
+     часто ложится иначе. */
+  try {
+    if (await framingOk(image)) return image;
+    console.warn('looks/charge: кадр обрезан — перерисовываю один раз');
+    return await generateLookImage(prompt);
+  } catch (retryErr) {
+    console.error('looks/charge: проверка/перерисовка не удалась, оставляем первую картинку:', retryErr);
+    return image;
   }
 }
 

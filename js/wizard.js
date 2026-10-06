@@ -283,10 +283,14 @@
      и противоречил и тексту, и картинке). Куртки/пальто/пиджаки теперь тоже
      попадают в "Верх" — это единственный слой, который может стать реальной
      вещью пользователя. */
+  /* 2026-10-06 — вещи, которые носят ПОВЕРХ (куртка, жакет, кардиган...), снова уходят в свой слой
+     "Верхняя одежда", а "Верх" остаётся из шаблона: с возвратом картинки живой тест показал, что
+     куртка вместо "Верх" рисуется единственным слоем, застёгнутой на голое тело — "как кофта". */
   var ITEM_CATEGORY_KEYWORDS = [
     { category: 'dress', words: ['платье', 'сарафан'] },
     { category: 'Низ', words: ['брюки', 'джинсы', 'юбка', 'юбку', 'юбочка', 'шорты', 'легинсы', 'штаны', 'бриджи'] },
-    { category: 'Верх', words: ['рубашка', 'рубашку', 'блуза', 'блузка', 'блузку', 'футболка', 'футболку', 'свитер', 'джемпер', 'водолазка', 'топ', 'кофта', 'кофту', 'пальто', 'куртка', 'куртку', 'плащ', 'пуховик', 'жакет', 'жакетом', 'пиджак', 'пиджака', 'тренч', 'кардиган'] },
+    { category: 'outer', words: ['пальто', 'куртка', 'куртку', 'плащ', 'пуховик', 'жакет', 'пиджак', 'тренч', 'кардиган', 'бомбер', 'ветровк'] },
+    { category: 'Верх', words: ['рубашка', 'рубашку', 'блуза', 'блузка', 'блузку', 'футболка', 'футболку', 'свитер', 'джемпер', 'водолазка', 'топ', 'кофта', 'кофту'] },
     { category: 'Обувь', words: ['туфли', 'кроссовки', 'ботинки', 'сапоги', 'лодочки', 'сандалии', 'кеды'] }
   ];
 
@@ -301,13 +305,25 @@
     return null;
   }
 
-  function applyItemToLayers(layers, itemText) {
+  /* underTop — что надето ПОД верхней одеждой, если вещь клиентки — куртка/жакет/кардиган
+     (см. buildTemplateResult). */
+  function applyItemToLayers(layers, itemText, underTop) {
     var result = {};
     Object.keys(layers).forEach(function (key) { result[key] = layers[key]; });
     if (!itemText || !itemText.trim()) return result;
 
     var quoted = 'Уже есть — это ваша вещь: «' + escapeHtml(itemText.trim()) + '»';
     var category = detectItemCategory(itemText);
+    if (category === 'outer') {
+      /* Новый объект, чтобы "Верхняя одежда" стояла сразу после "Низ" — в этом порядке слои
+         показываются в результате. */
+      var ordered = {};
+      Object.keys(result).forEach(function (key) {
+        ordered[key] = key === 'Верх' && underTop ? underTop : result[key];
+        if (key === 'Низ') ordered['Верхняя одежда'] = quoted;
+      });
+      return ordered;
+    }
     if (category === 'dress') {
       result['Верх'] = quoted + ' (выполняет роль верха и низа)';
       result['Низ'] = quoted + ' (выполняет роль верха и низа)';
@@ -526,7 +542,10 @@
     var templateSet = isMale ? TEMPLATES_MALE : TEMPLATES;
     var isTeen = answers.age === 'teen';
     var tpl = isTeen ? templateSet.teen : (templateSet[answers.occasion] || templateSet.office);
-    var layers = applyItemToLayers(tpl.layers, answers.item);
+    /* Под куртку/жакет — верх из шаблона; у женского "Мероприятия" верх шаблона сам жакет без
+       рукавов — под чужой жакет он не годится, ставим топ. */
+    var underTop = (!isMale && !isTeen && answers.occasion === 'event') ? 'Однотонный шёлковый топ' : tpl.layers['Верх'];
+    var layers = applyItemToLayers(tpl.layers, answers.item, underTop);
     return { tpl: tpl, layers: layers, isMale: isMale };
   }
 
@@ -903,7 +922,7 @@
 
     var itemNote = answers.item ? 'Вещь: «' + escapeHtml(answers.item) + '». ' : '';
     root.appendChild(el('p', 'wizard-result__note',
-      itemNote + 'Слой «Верх» — ваша вещь с фото, остальные слои алгоритм подобрал под повод «' +
+      itemNote + 'Ваша вещь уже в образе, остальные слои алгоритм подобрал под повод «' +
       tpl.title.toLowerCase() + '» и ваши ответы. Образ прямо на вашем собственном фото — на ' +
       '«Онлайн-стилисте», отдельным продуктом.'
     ));
