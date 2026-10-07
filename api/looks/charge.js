@@ -31,7 +31,7 @@
 
 const { requireUser } = require('../../lib/auth');
 const { previewObrazPoFotoEntitlement, chargeForObrazPoFoto } = require('../../lib/lookAccess');
-const { generateLookImage, buildLookImagePrompt, sizeToBodyPhrase, extractClothingSize } = require('../../lib/yandexart');
+const { generateLookImage, buildLookImagePrompt, sizeToBodyPhrase, extractClothingSize, stripQuotedText } = require('../../lib/yandexart');
 const { generateLookImageFlux2 } = require('../../lib/flux');
 const { getAccessToken, uploadFile, chatWithImage } = require('../../lib/gigachat');
 const { saveLook } = require('../../lib/savedLooks');
@@ -134,7 +134,13 @@ function buildItemPhotoPrompt(layers, fit, gender, hair) {
     var value = unescapeHtml(layers[k]);
     var m = WRAPPED_ITEM_RE.exec(value);
     if (m) {
-      if (!itemText) itemText = m[2].trim().replace(/\.$/, '');
+      /* 2026-10-07 — живой тест: «надписью "MOSCHINO"» в описании → BFL отклонил запрос
+         ("Request Moderated: Protected Content") и картинку рисовал запасной YandexART. Надписи в
+         кавычках и слова капсом (бренды) из текста убираем — принт FLUX.2 и так видит на фото. */
+      if (!itemText) {
+        itemText = stripQuotedText(m[2]).replace(/\b[A-Z][A-Z0-9&.'-]{2,}\b/g, '')
+          .replace(/\s{2,}/g, ' ').trim().replace(/\.$/, '');
+      }
       return;
     }
     rest.push(k.toLowerCase() + ' — ' + value.split(/ — |,| или /)[0]);
@@ -158,7 +164,8 @@ function buildItemPhotoPrompt(layers, fit, gender, hair) {
     'изменений. Надета так же, как на фото. Фон и поза — новые, как в каталоге; остальная одежда с ' +
     'фото не нужна.';
   if (rest.length) prompt += ' Остальной образ: ' + rest.join('; ') + '.';
-  return prompt + ' Без текста на картинке.';
+  /* Не «без текста на картинке», как у YandexART: так FLUX.2 стирает и надписи принта самой вещи. */
+  return prompt + ' Не добавляй на картинку своих подписей — принт вещи оставь как на фото.';
 }
 
 async function tryGenerateImage(layers, fit, gender, hair, itemPhoto) {
