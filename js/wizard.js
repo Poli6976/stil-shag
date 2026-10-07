@@ -934,8 +934,8 @@
 
     if (image) {
       var imageNote = el('p', 'wizard-result__note');
-      imageNote.textContent = 'Картинка — рисованная модель вашего типажа (цвет волос и фигура — по вашим ' +
-        'ответам), а не вы и не фотография вашей вещи. Это ориентир, как может выглядеть образ целиком.';
+      imageNote.textContent = 'Картинка — ориентир, как может выглядеть образ целиком. Если на фото вещи ' +
+        'есть человек, нарисован он; если вещь снята отдельно — модель вашего типажа по ответам анкеты.';
       root.appendChild(imageNote);
       var img = document.createElement('img');
       img.className = 'wizard-result-image';
