@@ -572,7 +572,8 @@
         why: built.tpl.why,
         fit: answers.fit || '',
         gender: built.isMale ? 'male' : 'female',
-        hair: answers.hair || ''
+        hair: answers.hair || '',
+        itemPhoto: answers.itemPhoto || null
       })
     })
       .then(function (res) {
@@ -695,6 +696,7 @@
       var photoStatus = el('p', 'wizard-photo-status', DEFAULT_PHOTO_HINT);
 
       function resetPhoto() {
+        answers.itemPhoto = null;
         photoInput.value = '';
         photoPreview.src = '';
         photoPreview.style.display = 'none';
@@ -721,6 +723,9 @@
         resizeImageFile(file, 1024)
           .then(function (dataUrl) {
             dataUrlForPreview = dataUrl;
+            /* Фото вещи уходит и на картинку (api/looks/charge.js → FLUX.2 рисует модель именно в этой
+               вещи): описание GigaChat теряет фактуру/длину/карманы, а клиентка может заменить его своим словом. */
+            answers.itemPhoto = dataUrl;
             photoPreview.src = dataUrl;
             photoPreview.style.display = 'block';
             photoRemoveBtn.style.display = 'inline-block';
