@@ -573,7 +573,8 @@
         fit: answers.fit || '',
         gender: built.isMale ? 'male' : 'female',
         hair: answers.hair || '',
-        itemPhoto: answers.itemPhoto || null
+        itemPhoto: answers.itemPhoto || null,
+        itemHasPerson: typeof answers.itemHasPerson === 'boolean' ? answers.itemHasPerson : null
       })
     })
       .then(function (res) {
@@ -697,6 +698,7 @@
 
       function resetPhoto() {
         answers.itemPhoto = null;
+        answers.itemHasPerson = null;
         photoInput.value = '';
         photoPreview.src = '';
         photoPreview.style.display = 'none';
@@ -749,6 +751,7 @@
           })
           .then(function (data) {
             answers.item = data.description || answers.item;
+            answers.itemHasPerson = typeof data.hasPerson === 'boolean' ? data.hasPerson : null;
             itemInput.value = answers.item;
             setNextEnabled(!!answers.item.trim());
             photoStatus.textContent = 'Готово — можно поправить текст вручную, если нужно.';

@@ -44,7 +44,20 @@ const SYSTEM_PROMPT =
   'предложением. Про мелкие детали (принт, вышивка, значок) пиши только то, в чём ' +
   'действительно уверена/уверен по картинке — не угадывай конкретный сюжет или персонажа ' +
   '(например, если не можешь разобрать, что именно изображено, пиши обобщённо: "силуэт ' +
-  'животного", "мелкий рисунок", а не выдумывай "сова" или "монстр", если это не точно так).';
+  'животного", "мелкий рисунок", а не выдумывай "сова" или "монстр", если это не точно так). ' +
+  'После описания — последней отдельной строкой СТРОГО «Человек: да», если вещь надета на ' +
+  'человека (видно его тело, хотя бы частично), или «Человек: нет», если вещь на вешалке, ' +
+  'манекене, разложена на поверхности и т.п.';
+
+/* 2026-10-08 — по строке «Человек: да/нет» api/looks/charge.js выбирает, как рисовать: человек есть —
+   рисуем его (один шаг FLUX.2); нет — сначала модель по анкете, потом одеваем её в вещь (два шага, иначе
+   FLUX.2 подгоняет фигуру под ширину вещи). Строку из описания убираем — клиентка её не видит. */
+var PERSON_LINE_RE = /\s*Человек:\s*(да|нет)[.!]?\s*$/i;
+function splitPersonLine(text) {
+  var m = PERSON_LINE_RE.exec(text);
+  if (!m) return { description: text, hasPerson: null };
+  return { description: text.slice(0, m.index).trim(), hasPerson: m[1].toLowerCase() === 'да' };
+}
 
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -93,9 +106,10 @@ module.exports = async function handler(req, res) {
 
     var token = await getAccessToken();
     var fileId = await uploadFile(token, imageBuffer, mime);
-    var description = await chatWithImage(token, SYSTEM_PROMPT, 'Опиши вещь на фото.', fileId);
+    var parsed = splitPersonLine(await chatWithImage(token, SYSTEM_PROMPT, 'Опиши вещь на фото.', fileId));
+    console.log('analyze-item: человек на фото —', parsed.hasPerson);
 
-    res.status(200).json({ description: description });
+    res.status(200).json({ description: parsed.description, hasPerson: parsed.hasPerson });
   } catch (err) {
     console.error('analyze-item error:', err);
     res.status(502).json({ error: 'Не получилось разобрать фото. Попробуйте ещё раз или опишите вещь текстом.' });

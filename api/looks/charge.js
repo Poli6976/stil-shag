@@ -147,21 +147,24 @@ function fluxBodyPhrase(size, gender) {
   return 'размер 5XL и больше, крупная фигура, плюс-сайз';
 }
 
-/* Промпт для FLUX.2 с фото вещи как образцом. Описание вещи от GigaChat (или слово клиентки) идёт
-   подсказкой, но главное — «ровно та же вещь, что на фото». Человек с фото (если вещь на ком-то
-   надета) нам не нужен: модель — типаж клиентки из анкеты. */
-function buildItemPhotoPrompt(layers, fit, gender, hair) {
+/* Делит слои на вещь клиентки (обёрнута js/wizard.js в «Уже есть — это ваша вещь») и остальной образ.
+   itemKey — слой вещи ('Верх', 'Низ', 'Верхняя одежда'); isDress — платье (обёрнуты и Верх, и Низ). */
+function splitItemLayers(layers) {
   var itemText = '';
+  var itemKey = null;
+  var wrappedCount = 0;
   var rest = [];
   ['Верх', 'Низ', 'Верхняя одежда', 'Обувь'].forEach(function (k) {
     if (!layers[k]) return;
     var value = unescapeHtml(layers[k]);
     var m = WRAPPED_ITEM_RE.exec(value);
     if (m) {
+      wrappedCount++;
       /* 2026-10-07 — живой тест: «надписью "MOSCHINO"» в описании → BFL отклонил запрос
          ("Request Moderated: Protected Content") и картинку рисовал запасной YandexART. Надписи в
          кавычках и слова капсом (бренды) из текста убираем — принт FLUX.2 и так видит на фото. */
       if (!itemText) {
+        itemKey = k;
         itemText = stripQuotedText(m[2]).replace(/\b[A-Z][A-Z0-9&.'-]{2,}\b/g, '')
           .replace(/\s{2,}/g, ' ').trim().replace(/\.$/, '');
       }
@@ -169,36 +172,99 @@ function buildItemPhotoPrompt(layers, fit, gender, hair) {
     }
     rest.push(k.toLowerCase() + ' — ' + value.split(/ — |,| или /)[0]);
   });
+  return { itemText: itemText, itemKey: itemKey, isDress: wrappedCount > 1, rest: rest };
+}
 
+function modelTypeNote(fit, gender, hair) {
   var hairPhrase = HAIR_PHRASES[hair];
+  var bodyPhrase = fluxBodyPhrase(extractClothingSize(fit), gender);
+  return (gender === 'male' ? 'мужчина' : 'женщина') + (hairPhrase ? ', ' + hairPhrase : '') +
+    (bodyPhrase ? ', ' + bodyPhrase : '');
+}
+
+var CATALOG_FRAME = 'Фотография для fashion-каталога на светлом однотонном фоне: одна модель в полный рост, ' +
+  'от макушки до обуви, ноги и обувь целиком в кадре.';
+/* Не «без текста на картинке», как у YandexART: так FLUX.2 стирает и надписи принта самой вещи. */
+var NO_CAPTIONS = ' Не добавляй на картинку своих подписей — принт вещи оставь как на фото.';
+
+/* 2026-10-08 — вещь без человека (на вешалке и т.п.) рисуем в ДВА шага. Живые тесты (серая блузка на
+   вешалке, размеры 48/50/52/54): в один шаг FLUX.2 при любом описании размера рисовал полную фигуру —
+   «тот же крой» широкой вещи он выполняет, подгоняя под её ширину тело. Шаг 1 — модель по анкете без
+   фото вещи перед глазами (вещь описана словами, как ориентир), шаг 2 — переодеть ЭТУ модель в вещь
+   с фото: фигура берётся с картинки шага 1. */
+function buildModelStepPrompt(layers, fit, gender, hair) {
+  var s = splitItemLayers(layers);
+  var outfit = (s.itemText ? [s.itemText] : []).concat(s.rest);
+  return CATALOG_FRAME + ' Модель — ' + modelTypeNote(fit, gender, hair) + '. Поза естественная, руки ' +
+    'не закрывают одежду.' + (outfit.length ? ' Одежда: ' + outfit.join('; ') + '.' : '') +
+    ' Без текста на картинке.';
+}
+
+function buildDressStepPrompt(layers) {
+  var s = splitItemLayers(layers);
+  var slot = s.isDress ? 'всю одежду, кроме обуви,'
+    : s.itemKey === 'Низ' ? 'низ (брюки, юбку или шорты)'
+    : s.itemKey === 'Верхняя одежда' ? 'верхнюю одежду (надень её поверх того, что на модели)'
+    : 'верх (то, что надето на торс)';
+  return 'Фото 1 — модель, фото 2 — вещь. Замени на модели с фото 1 ' + slot + ' на вещь с фото 2' +
+    (s.itemText ? ' (' + s.itemText + ')' : '') + ': ровно та же вещь — тот же цвет, фактура и рисунок ' +
+    'ткани, длина, крой, вырез, рукава, карманы и все детали. Вещь сидит по фигуре модели с фото 1. ' +
+    'Модель с фото 1 не меняй: то же лицо, волосы, та же фигура и комплекция, поза, фон, остальная ' +
+    'одежда и обувь. Кадр в полный рост, как на фото 1.' + NO_CAPTIONS;
+}
+
+/* Промпт для FLUX.2 с фото вещи как образцом, в один шаг — когда на фото вещи есть человек (или
+   неизвестно, есть ли). Описание вещи от GigaChat (или слово клиентки) идёт подсказкой, но главное —
+   «ровно та же вещь, что на фото». */
+function buildItemPhotoPrompt(layers, fit, gender, hair) {
+  var s = splitItemLayers(layers);
+  var itemText = s.itemText;
+  var rest = s.rest;
   /* 2026-10-07 — решение Андрея: если на фото вещи есть человек, рисуем ЕГО (лицо, фигура, цвет
      волос — как на фото; живой тест показал, что FLUX.2 и так тянет их с образца сильнее слов).
      Анкета (волосы, размер) — только когда вещь сфотографирована отдельно. Если это пойдёт хорошо —
      кандидат в новую схему «Онлайн-стилиста». */
-  var bodyPhrase = fluxBodyPhrase(extractClothingSize(fit), gender);
-  var typeNote = (gender === 'male' ? 'мужчина' : 'женщина') + (hairPhrase ? ', ' + hairPhrase : '') +
-    (bodyPhrase ? ', ' + bodyPhrase : '');
-  var prompt = 'Фотография для fashion-каталога на светлом однотонном фоне: одна модель в полный рост, ' +
-    'от макушки до обуви, ноги и обувь целиком в кадре. Если на исходном фото есть человек — модель это ' +
+  var prompt = CATALOG_FRAME + ' Если на исходном фото есть человек — модель это ' +
     'тот же самый человек: то же лицо, та же фигура и комплекция, тот же цвет волос. Если на исходном ' +
-    'фото человека нет — модель: ' + typeNote + '. ' +
+    'фото человека нет — модель: ' + modelTypeNote(fit, gender, hair) + '. ' +
     'На модели ровно та же вещь, что на исходном фото' + (itemText ? ' (' + itemText + ')' : '') +
     ': тот же цвет, фактура и рисунок ткани, длина, крой, вырез, рукава, карманы и все детали — без ' +
     'изменений. Надета так же, как на фото. Фон и поза — новые, как в каталоге; остальная одежда с ' +
     'фото не нужна.';
   if (rest.length) prompt += ' Остальной образ: ' + rest.join('; ') + '.';
-  /* Не «без текста на картинке», как у YandexART: так FLUX.2 стирает и надписи принта самой вещи. */
-  return prompt + ' Не добавляй на картинку своих подписей — принт вещи оставь как на фото.';
+  return prompt + NO_CAPTIONS;
 }
 
-async function tryGenerateImage(layers, fit, gender, hair, itemPhoto) {
+var FLUX_SIZE = { width: 768, height: 1152 };
+
+async function generateTwoStep(layers, fit, gender, hair, itemPhoto) {
+  var modelPrompt = buildModelStepPrompt(layers, fit, gender, hair);
+  var dressPrompt = buildDressStepPrompt(layers);
+  console.log('looks/charge: шаг 1 (модель) —', modelPrompt);
+  console.log('looks/charge: шаг 2 (одеть) —', dressPrompt);
+  var model = await generateLookImageFlux2(modelPrompt, null, { textOnly: true, width: FLUX_SIZE.width, height: FLUX_SIZE.height });
+  return generateLookImageFlux2(dressPrompt, model, { extraImages: [itemPhoto], width: FLUX_SIZE.width, height: FLUX_SIZE.height });
+}
+
+async function tryGenerateImage(layers, fit, gender, hair, itemPhoto, itemHasPerson) {
   if (!Object.keys(layers).length) return null;
   if (itemPhoto && process.env.FLUX_API_KEY) {
+    if (itemHasPerson === false) {
+      try {
+        var twoStepImage = await withFramingRetry(function () {
+          return generateTwoStep(layers, fit, gender, hair, itemPhoto);
+        });
+        console.log('looks/charge: картинка — FLUX.2 [pro] в два шага (модель по анкете + вещь с фото)');
+        return twoStepImage;
+      } catch (twoStepErr) {
+        console.error('looks/charge: два шага FLUX.2 не сработали, пробую один шаг:', twoStepErr && twoStepErr.message);
+      }
+    }
     var fluxPrompt = buildItemPhotoPrompt(layers, fit, gender, hair);
     console.log('looks/charge: промпт FLUX.2 по фото вещи —', fluxPrompt);
     try {
       var fluxImage = await withFramingRetry(function () {
-        return generateLookImageFlux2(fluxPrompt, itemPhoto, { width: 768, height: 1152 });
+        return generateLookImageFlux2(fluxPrompt, itemPhoto, FLUX_SIZE);
       });
       console.log('looks/charge: картинка — FLUX.2 [pro] по фото вещи');
       return fluxImage;
@@ -262,6 +328,7 @@ module.exports = async function handler(req, res) {
   var gender = body.gender === 'male' ? 'male' : 'female';
   var hair = typeof body.hair === 'string' ? body.hair : '';
   var itemPhoto = parseItemPhoto(body.itemPhoto);
+  var itemHasPerson = typeof body.itemHasPerson === 'boolean' ? body.itemHasPerson : null;
 
   try {
     var entitled = await previewObrazPoFotoEntitlement(user.id);
@@ -277,7 +344,7 @@ module.exports = async function handler(req, res) {
 
   /* Картинку рисуем ДО списания (проверка баланса выше — чтобы не платить за картинку тому, кому
      нечем платить), списываем после — тот же порядок, что в api/compose-look.js. */
-  var imageBase64 = await tryGenerateImage(layers, fit, gender, hair, itemPhoto);
+  var imageBase64 = await tryGenerateImage(layers, fit, gender, hair, itemPhoto, itemHasPerson);
 
   try {
     var result = await chargeForObrazPoFoto(user.id);
