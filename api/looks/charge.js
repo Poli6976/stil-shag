@@ -31,7 +31,7 @@
 
 const { requireUser } = require('../../lib/auth');
 const { previewObrazPoFotoEntitlement, chargeForObrazPoFoto } = require('../../lib/lookAccess');
-const { generateLookImage, buildLookImagePrompt, sizeToBodyPhrase, extractClothingSize, stripQuotedText } = require('../../lib/yandexart');
+const { generateLookImage, buildLookImagePrompt, extractClothingSize, stripQuotedText } = require('../../lib/yandexart');
 const { generateLookImageFlux2 } = require('../../lib/flux');
 const { getAccessToken, uploadFile, chatWithImage } = require('../../lib/gigachat');
 const { saveLook } = require('../../lib/savedLooks');
@@ -123,6 +123,30 @@ function parseItemPhoto(raw) {
   return m[1];
 }
 
+/* 2026-10-08 — фигура для FLUX.2 буквенным размером, без российской цифры. Живые тесты (блузка на
+   вешалке): «российский размер 48: плотнее среднего» и «50: плотнее среднего» дали фигуры плюс-сайз —
+   похоже, модель читает «48/50» как европейский размер (EU 48 ≈ RU 54) и ещё усиливает «плотнее».
+   52 («полная фигура») легло примерно верно. Ступени — по обычной таблице RU→буквенный; нежелательных
+   слов («полная» для 48–50) не называем даже с «не» — модели цепляются за само слово. sizeToBodyPhrase
+   (lib/yandexart.js) не трогаем: он подобран под YandexART, который рисует запасным. */
+function fluxBodyPhrase(size, gender) {
+  if (!size) return '';
+  if (gender === 'male') {
+    if (size <= 48) return 'размер M, стройное телосложение';
+    if (size <= 50) return 'размер L, обычное среднее телосложение';
+    if (size <= 52) return 'размер XL, плотное телосложение';
+    if (size <= 56) return 'размер XXL–3XL, крупное телосложение';
+    return 'размер 4XL и больше, очень крупное телосложение';
+  }
+  if (size <= 44) return 'размер S, стройная фигура';
+  if (size <= 46) return 'размер M, стройная фигура';
+  if (size <= 48) return 'размер L, обычная фигура среднего телосложения';
+  if (size <= 50) return 'размер XL, среднее телосложение со слегка округлыми формами';
+  if (size <= 52) return 'размер XXL, полная фигура';
+  if (size <= 56) return 'размер 3XL–4XL, полная фигура, плюс-сайз';
+  return 'размер 5XL и больше, крупная фигура, плюс-сайз';
+}
+
 /* Промпт для FLUX.2 с фото вещи как образцом. Описание вещи от GigaChat (или слово клиентки) идёт
    подсказкой, но главное — «ровно та же вещь, что на фото». Человек с фото (если вещь на ком-то
    надета) нам не нужен: модель — типаж клиентки из анкеты. */
@@ -151,10 +175,9 @@ function buildItemPhotoPrompt(layers, fit, gender, hair) {
      волос — как на фото; живой тест показал, что FLUX.2 и так тянет их с образца сильнее слов).
      Анкета (волосы, размер) — только когда вещь сфотографирована отдельно. Если это пойдёт хорошо —
      кандидат в новую схему «Онлайн-стилиста». */
-  var size = extractClothingSize(fit);
-  var bodyPhrase = sizeToBodyPhrase(size);
+  var bodyPhrase = fluxBodyPhrase(extractClothingSize(fit), gender);
   var typeNote = (gender === 'male' ? 'мужчина' : 'женщина') + (hairPhrase ? ', ' + hairPhrase : '') +
-    (size ? ', российский размер одежды ' + size + (bodyPhrase ? ': ' + bodyPhrase : ', стройная') : '');
+    (bodyPhrase ? ', ' + bodyPhrase : '');
   var prompt = 'Фотография для fashion-каталога на светлом однотонном фоне: одна модель в полный рост, ' +
     'от макушки до обуви, ноги и обувь целиком в кадре. Если на исходном фото есть человек — модель это ' +
     'тот же самый человек: то же лицо, та же фигура и комплекция, тот же цвет волос. Если на исходном ' +
