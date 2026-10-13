@@ -629,6 +629,20 @@ function keepLayerKeys(itemHint, layers, realKey) {
   return keys;
 }
 
+/* 2026-10-13 — живой тест "рубашка жакет" (коричневая клетка, носится нараспашку поверх): вещь клиентки
+   легла в "Верх", а сверху добавилась придуманная "Верхняя одежда" (графитовая кожаная куртка, ветровка) —
+   на картинке клетку закрыло целиком или FLUX.2 вовсе её не нарисовал, хотя в карточке она есть. Если
+   настоящая вещь в "Верх" сама из тех, что носят поверх (жакет, рубашка-жакет, кардиган...), вторую вещь
+   поверх неё не добавляем. Возвращает true, если слой убран. */
+var WORN_OVER_RE = /куртк|пиджак|жакет|блейзер|пальто|тренч|плащ|ветровк|бомбер|кардиган/i;
+function dropOuterOverJacketItem(itemHint, layers, keepKeys) {
+  if (keepKeys.indexOf('Верх') === -1 || keepKeys.indexOf('Верхняя одежда') !== -1) return false;
+  if (!layers['Верхняя одежда']) return false;
+  if (!WORN_OVER_RE.test(itemHint || '') && !WORN_OVER_RE.test(layers['Верх'] || '')) return false;
+  delete layers['Верхняя одежда'];
+  return true;
+}
+
 function parseLayers(text) {
   var layers = {};
   var why = '';
@@ -827,6 +841,9 @@ module.exports = async function handler(req, res) {
       }
     }
     var keepKeys = keepLayerKeys(itemHint, parsed.layers, parsed.realKey);
+    if (dropOuterOverJacketItem(itemHint, parsed.layers, keepKeys)) {
+      console.warn('compose-look: вещь клиентки сама носится поверх («' + (itemHint || parsed.layers['Верх']) + '») — придуманная верхняя одежда убрана, чтобы её не закрыть');
+    }
     /* Исправленная самопроверкой версия может потерять строку "Цвет волос" — тогда берём из первого ответа. */
     var hairColor = parsed.hairColor || parseLayers(raw).hairColor;
     console.log('compose-look: слои —', JSON.stringify(parsed.layers), '| настоящая вещь:', JSON.stringify(keepKeys), '| цвет волос:', hairColor || 'не назван');
