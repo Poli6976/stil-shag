@@ -114,6 +114,12 @@
     return n + ' образов';
   }
 
+  /* «· прогулка, осень» — служебный слой «Сезон» из анкеты (2026-10-19). */
+  function seasonSuffix(look) {
+    var s = look && look.layers && look.layers['Сезон'];
+    return s ? ' · ' + s : '';
+  }
+
   function layersText(look) {
     var layers = look.layers || {};
     return LAYER_LABELS
@@ -327,7 +333,7 @@
     card.appendChild(media);
 
     var body = el('div', 'saved-look-card__body');
-    var dateLine = el('div', 'saved-look-card__date', formatDate(look.createdAt));
+    var dateLine = el('div', 'saved-look-card__date', formatDate(look.createdAt) + seasonSuffix(look));
     if (look.rating) {
       dateLine.appendChild(el('span', 'saved-look-card__rating' + (look.rating.rating === 'like' ? ' is-like' : ''),
         look.rating.rating === 'like' ? ' · ♥ нравится' : ' · не моё'));
@@ -466,7 +472,7 @@
       figure.classList.remove('is-zoomed');
       img.src = look.imageUrl;
       img.alt = 'Образ от ' + formatDate(look.createdAt);
-      date.textContent = formatDate(look.createdAt);
+      date.textContent = formatDate(look.createdAt) + seasonSuffix(look);
       counter.textContent = withImages.length > 1 ? (current + 1) + ' из ' + withImages.length : '';
       list.innerHTML = '';
       var layers = look.layers || {};

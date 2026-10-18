@@ -326,6 +326,8 @@
          показываются в результате. */
       var ordered = {};
       Object.keys(result).forEach(function (key) {
+        /* Сезонный шаблон «Прогулки» уже содержит свою «Верхнюю одежду» — вещь клиентки её заменяет. */
+        if (key === 'Верхняя одежда') return;
         ordered[key] = key === 'Верх' && underTop ? underTop : result[key];
         if (key === 'Низ') ordered['Верхняя одежда'] = quoted;
       });
@@ -576,11 +578,238 @@
     }
   }
 
+  /* ============ Сезон для повода «Прогулка» (ТЗ «Прогулка по сезонам», v2, 2026-10-19) ============
+     Только для «Прогулки»: после выбора повода на том же шаге — Весна · Лето · Осень · Зима, по
+     умолчанию текущий сезон по дате. Шаблоны — без ИИ. Цвет верхней одежды — по цветотипу клиентки
+     (шаг «colors» идёт позже, поэтому подставляется при сборке результата) с поправкой на цвет вещи;
+     обувь осенью/весной — по типу вещи. Строки «Верхней одежды» и «Обуви» начинаются с главного
+     варианта до « — »/запятой: api/looks/charge.js берёт для картинки только эту часть. */
+  var SEASONS = [
+    { value: 'spring', label: 'Весна', name: 'весна' },
+    { value: 'summer', label: 'Лето', name: 'лето' },
+    { value: 'autumn', label: 'Осень', name: 'осень' },
+    { value: 'winter', label: 'Зима', name: 'зима' }
+  ];
+
+  function seasonByDate(date) {
+    var m = (date || new Date()).getMonth() + 1;
+    if (m >= 3 && m <= 5) return 'spring';
+    if (m >= 6 && m <= 8) return 'summer';
+    if (m >= 9 && m <= 11) return 'autumn';
+    return 'winter';
+  }
+
+  function seasonName(value) {
+    for (var i = 0; i < SEASONS.length; i++) if (SEASONS[i].value === value) return SEASONS[i].name;
+    return '';
+  }
+
+  /* Цвета верхней одежды по цветотипу — в порядке таблицы ТЗ (раздел 3): [именительный, родительный,
+     светлота 0–100]. Светлота нужна только для поправки на цвет вещи (см. outerColors). */
+  var OUTER_COLORS = {
+    spring: [['молочный', 'молочного', 90], ['светлый кэмел', 'светло-кэмелового', 65], ['песочный', 'песочного', 75]],
+    autumn: [['кэмел', 'кэмелового', 55], ['табачный', 'табачного', 40], ['оливковый', 'оливкового', 38], ['шоколадный', 'шоколадного', 25]],
+    summer: [['серо-голубой', 'серо-голубого', 65], ['светло-серый', 'светло-серого', 80], ['пыльно-розовый', 'пыльно-розового', 75]],
+    winter: [['графитовый', 'графитового', 25], ['тёмно-синий', 'тёмно-синего', 18], ['чёрный', 'чёрного', 5], ['чисто-белый', 'чисто-белого', 100]],
+    neutral: [['серо-бежевый (тауп)', 'серо-бежевого', 60], ['графитовый', 'графитового', 25], ['тёмно-синий', 'тёмно-синего', 18]]
+  };
+  var LIGHT_ITEM_WORDS = ['бел', 'молочн', 'бежев', 'кремов', 'светл', 'пастел', 'айвори', 'нюд', 'песочн'];
+  var DARK_ITEM_WORDS = ['чёрн', 'черн', 'тёмн', 'темн', 'графит', 'бордов', 'шоколад', 'антрацит'];
+
+  function colorTypeKey(type) {
+    var keys = Object.keys(COLOR_TYPES);
+    for (var i = 0; i < keys.length; i++) if (COLOR_TYPES[keys[i]] === type) return keys[i];
+    return 'neutral';
+  }
+
+  function itemTone(itemText) {
+    var t = String(itemText || '').toLowerCase();
+    if (DARK_ITEM_WORDS.some(function (w) { return t.indexOf(w) !== -1; })) return 'dark';
+    if (LIGHT_ITEM_WORDS.some(function (w) { return t.indexOf(w) !== -1; })) return 'light';
+    return null;
+  }
+
+  /* Два цвета по правилу ТЗ: к светлой вещи — два самых тёмных из строки цветотипа, к тёмной — два
+     самых светлых (чтобы вещь и верхняя одежда не сливались), цвет вещи не распознан — первые два
+     цвета строки (например, «кэмел или табачный»). */
+  function outerColors() {
+    var list = OUTER_COLORS[colorTypeKey(computeColorType(answers))] || OUTER_COLORS.neutral;
+    var tone = itemTone(answers.item);
+    var picked = list.slice();
+    if (tone === 'light') picked.sort(function (a, b) { return a[2] - b[2]; });
+    if (tone === 'dark') picked.sort(function (a, b) { return b[2] - a[2]; });
+    return [picked[0], picked[1] || picked[0]];
+  }
+
+  /* Вид вещи для выбора обуви: платье/юбка → сапоги, брюки/джинсы → челси или полуботинки. */
+  function itemKind() {
+    var t = String(answers.item || '').toLowerCase();
+    var cat = detectItemCategory(answers.item);
+    if (cat === 'dress' || t.indexOf('юбк') !== -1 || t.indexOf('юбочк') !== -1) return 'skirt';
+    if (cat === 'Низ') return 'pants';
+    return 'other';
+  }
+
+  var SEASON_SHOES = {
+    spring: {
+      skirt: 'Полуботинки или лоферы; на холодную весну — женские кожаные сапоги на молнии',
+      pants: 'Полуботинки, лоферы или ботинки челси',
+      other: 'Полуботинки, лоферы или ботинки челси'
+    },
+    summer: {
+      skirt: 'Сандалии на плоской подошве, кеды или эспадрильи',
+      pants: 'Кеды, сандалии на плоской подошве или эспадрильи',
+      other: 'Кеды, сандалии на плоской подошве или эспадрильи'
+    },
+    autumn: {
+      skirt: 'Женские кожаные сапоги на молнии — по колено, на устойчивом каблуке или плоской подошве',
+      pants: 'Ботинки челси или полуботинки на шнуровке; для прогулки — кожаные кроссовки',
+      other: 'Ботинки челси, полуботинки или кожаные кроссовки'
+    },
+    winter: {
+      skirt: 'Утеплённые кожаные сапоги на молнии или утеплённые ботинки, на нескользящей подошве',
+      pants: 'Утеплённые ботинки на нескользящей подошве',
+      other: 'Утеплённые ботинки или сапоги на нескользящей подошве'
+    }
+  };
+
+  var WALK_SEASON_TEMPLATES = {
+    spring: {
+      layers: {
+        'Верх': 'Тонкий джемпер или хлопковая рубашка',
+        'Низ': 'Прямые джинсы или брюки из плотного хлопка',
+        'Верхняя одежда': '{OUTER_SPRING}',
+        'Обувь': '{SHOES}',
+        'Аксессуары': 'Лёгкий шарф или платок, кросс-боди сумка, зонт',
+        'Причёска': 'Свободные волны или низкий хвост',
+        'Макияж': 'Лёгкий сияющий тон, румяна, бальзам для губ'
+      },
+      why: 'Лёгкие слои снимаются по погоде, а светлая верхняя одежда освежает образ после зимы и не спорит с вашей вещью.',
+      products: [
+        { name: 'Тренч или плащ', note: 'Светлый тон, цвет — по вашему типажу' },
+        { name: 'Полуботинки или лоферы', note: 'Удобно на весь день' },
+        { name: 'Лёгкий шарф или платок', note: 'Цвет — из списка «Идут вам»' }
+      ]
+    },
+    summer: {
+      layers: {
+        'Верх': 'Льняная рубашка или хлопковая футболка свободного кроя',
+        'Низ': 'Прямые джинсы светлого индиго или юбка-миди из хлопка',
+        'Верхняя одежда': 'Не обязательна',
+        'Обувь': '{SHOES}',
+        'Аксессуары': 'Соломенная сумка, солнцезащитные очки',
+        'Причёска': 'Высокий пучок или свободные волны — волосы с шеи',
+        'Макияж': 'Лёгкий тон с SPF, бальзам для губ'
+      },
+      why: 'Натуральные ткани дышат, а лишних слоёв в жару не нужно — акцентом остаётся ваша вещь.',
+      products: [
+        { name: 'Кеды или эспадрильи', note: 'Лёгкая летняя пара' },
+        { name: 'Солнцезащитные очки', note: 'Защита и завершённость образа' },
+        { name: 'Соломенная сумка', note: 'Летний акцент' }
+      ]
+    },
+    autumn: {
+      layers: {
+        'Верх': 'Трикотажный джемпер оверсайз',
+        'Низ': 'Прямые джинсы или брюки, юбка-миди из плотной ткани',
+        'Верхняя одежда': '{OUTER_AUTUMN}',
+        'Обувь': '{SHOES}',
+        'Аксессуары': 'Кросс-боди сумка, тонкий шарф, зонт',
+        'Причёска': 'Свободные волны или собранный пучок',
+        'Макияж': 'Лёгкий тон и бальзам для губ'
+      },
+      why: 'Тренч, плащ или пальто держат форму и не спорят с вещью: их цвет подобран под ваш типаж, а акцент остаётся за вашей вещью.',
+      products: [
+        { name: 'Тренч, плащ или лёгкое пальто', note: 'Цвет — по вашему типажу' },
+        { name: 'Ботинки челси, полуботинки или сапоги на молнии', note: 'По вашей вещи — см. «Обувь» выше' },
+        { name: 'Тонкий шарф', note: 'Цвет — из списка «Идут вам»' }
+      ]
+    },
+    winter: {
+      layers: {
+        'Верх': 'Тёплый свитер из шерсти или кашемира, под ним — тонкая водолазка',
+        'Низ': 'Утеплённые прямые брюки или джинсы плотного денима',
+        'Верхняя одежда': '{OUTER_WINTER}',
+        'Обувь': '{SHOES}',
+        'Аксессуары': 'Объёмный шарф, шапка-бини, тёплые перчатки',
+        'Причёска': 'Низкий пучок или свободные волосы — удобно под шапку',
+        'Макияж': 'Плотный увлажняющий крем, бальзам для губ — защита от мороза'
+      },
+      why: 'Тепло строится слоями: тонкий у тела, тёплый поверх, а спокойная верхняя одежда оставляет вашу вещь главной.',
+      products: [
+        { name: 'Пуховик или шерстяное пальто', note: 'Цвет — по вашему типажу' },
+        { name: 'Утеплённые ботинки или сапоги', note: 'На нескользящей подошве' },
+        { name: 'Шарф, шапка и перчатки', note: 'В одном тоне, цвет — из «Идут вам»' }
+      ]
+    }
+  };
+
+  var TEEN_SEASON = {
+    spring: { outer: 'Ветровка или лёгкая куртка', shoes: 'Кроссовки или кеды', acc: 'Рюкзак, кепка' },
+    summer: { outer: 'Не обязательна', shoes: 'Кеды или сандалии', acc: 'Кепка, рюкзак' },
+    autumn: { outer: 'Ветровка или стёганая куртка', shoes: 'Кроссовки или ботинки', acc: 'Рюкзак с ярким акцентом' },
+    winter: { outer: 'Пуховик с капюшоном', shoes: 'Зимние ботинки или дутики на нескользящей подошве', acc: 'Шапка, варежки или перчатки, снуд' }
+  };
+
+  function outerText(season) {
+    var c = outerColors();
+    var alt = c[0][0] === c[1][0] ? c[0][0] : c[0][0] + ' или ' + c[1][0];
+    if (season === 'winter') {
+      return 'Шерстяное пальто прямого кроя ' + c[0][1] + ' цвета — или пуховик до середины бедра; цвет по вашему типажу: ' + alt;
+    }
+    return 'Тренч ' + c[0][1] + ' цвета — или плащ, лёгкое пальто; цвет по вашему типажу: ' + alt +
+      '; в дождь — ветровка с капюшоном';
+  }
+
+  /* Шаблон «Прогулки» под сезон: копия, плейсхолдеры заменены. */
+  function walkSeasonTemplate(season, isTeen) {
+    var base = WALK_SEASON_TEMPLATES[season] || WALK_SEASON_TEMPLATES.autumn;
+    var kind = itemKind();
+    var layers = {};
+    Object.keys(base.layers).forEach(function (k) { layers[k] = base.layers[k]; });
+    layers['Обувь'] = SEASON_SHOES[season][kind];
+    layers['Верхняя одежда'] = season === 'summer' ? 'Не обязательна' : outerText(season);
+    var products = base.products.slice();
+    var why = base.why;
+    if (season === 'winter' && kind === 'skirt') {
+      layers['Аксессуары'] = 'Плотные колготки, тонкая водолазка под платье или юбку, объёмный шарф, шапка-бини, тёплые перчатки';
+    }
+    if (isTeen) {
+      var tb = TEMPLATES.teen;
+      var teen = TEEN_SEASON[season];
+      layers = {
+        'Верх': tb.layers['Верх'], 'Низ': tb.layers['Низ'], 'Верхняя одежда': teen.outer,
+        'Обувь': teen.shoes, 'Аксессуары': teen.acc, 'Причёска': tb.layers['Причёска'], 'Макияж': tb.layers['Макияж']
+      };
+      /* «Что докупить» — сезонный и у подростка (в общем teen-шаблоне — «кроссовки на смену» даже зимой). */
+      products = [
+        { name: teen.shoes, note: 'По сезону, без каблука' },
+        { name: teen.acc, note: 'Акцент образа' }
+      ];
+      if (teen.outer !== 'Не обязательна') products.unshift({ name: teen.outer, note: 'Удобно и практично' });
+      why = tb.why;
+    }
+    return { title: 'Прогулка', season: season, layers: layers, why: why, products: products };
+  }
+
+  /* Вещь не по сезону — только мягкая подсказка, без блокировки. */
+  var OFF_SEASON_WORDS = {
+    summer: ['пуховик', 'шуба', 'шубк', 'дублёнк', 'дубленк', 'валенк', 'угги'],
+    winter: ['сарафан', 'шорт', 'босоножк', 'сандали', 'шлёпанц', 'шлепанц', 'вьетнамк']
+  };
+  function offSeasonNote(season, itemText) {
+    var words = OFF_SEASON_WORDS[season];
+    var t = String(itemText || '').toLowerCase();
+    if (!words || !words.some(function (w) { return t.indexOf(w) !== -1; })) return '';
+    return 'Вещь скорее для другого сезона — мы собрали образ так, чтобы её можно было носить сейчас.';
+  }
+
   function buildTemplateResult() {
     var isMale = answers.forWhom === 'husband' || answers.forWhom === 'son';
     var templateSet = isMale ? TEMPLATES_MALE : TEMPLATES;
     var isTeen = answers.age === 'teen';
     var tpl = isTeen ? templateSet.teen : (templateSet[answers.occasion] || templateSet.office);
+    if (!isMale && answers.occasion === 'walk' && answers.season) tpl = walkSeasonTemplate(answers.season, isTeen);
     /* Под куртку/жакет — верх из шаблона; у женского "Мероприятия" верх шаблона сам жакет без
        рукавов — под чужой жакет он не годится, ставим топ. */
     var underTop = (!isMale && !isTeen && answers.occasion === 'event') ? 'Однотонный шёлковый топ' : tpl.layers['Верх'];
@@ -594,6 +823,18 @@
      статичных шаблонов (бесплатно для нас) и уходят на сервер вместе со
      списанием — там по ним рисуется модель типажа клиентки (цвет волос из
      анкеты) и всё сохраняется в «Мои образы» (api/looks/charge.js). */
+  /* На сервер (картинка и «Мои образы») не отправляем строку «Не обязательна» — иначе она попадёт
+     в описание картинки. Сезон — служебным полем «Сезон» (charge.js не берёт его в картинку). */
+  function layersForServer(built) {
+    var out = {};
+    Object.keys(built.layers).forEach(function (k) {
+      if (built.layers[k] === 'Не обязательна') return;
+      out[k] = built.layers[k];
+    });
+    if (built.tpl.season) out['Сезон'] = 'прогулка, ' + seasonName(built.tpl.season);
+    return out;
+  }
+
   function chargeAndRenderResult() {
     root.innerHTML = '';
     root.appendChild(el('p', 'wizard-step__hint', 'Собираем и рисуем ваш образ — это займёт до минуты…'));
@@ -607,7 +848,7 @@
         'Authorization': 'Bearer ' + currentSession.access_token
       },
       body: JSON.stringify({
-        layers: built.layers,
+        layers: layersForServer(built),
         why: built.tpl.why,
         fit: answers.fit || '',
         gender: built.isMale ? 'male' : 'female',
@@ -640,6 +881,13 @@
         root.appendChild(link);
         renderRestartLinks();
       });
+  }
+
+  function focusSeason(value) {
+    var idx = -1;
+    SEASONS.forEach(function (s, i) { if (s.value === value) idx = i; });
+    var btns = root.querySelectorAll('.wizard-season__options .wizard-option');
+    if (btns[idx]) btns[idx].focus();
   }
 
   function goBack() {
@@ -904,6 +1152,10 @@
         btn.type = 'button';
         btn.addEventListener('click', function () {
           answers[step.id] = opt.value;
+          if (step.id === 'occasion') {
+            if (opt.value === 'walk') { if (!answers.season) answers.season = seasonByDate(); }
+            else delete answers.season;
+          }
           render();
         });
         optWrap.appendChild(btn);
@@ -911,6 +1163,47 @@
       root.appendChild(optWrap);
 
       canAdvance = !!answers[step.id];
+
+      /* Сезон — только для «Прогулки» (ТЗ «Прогулка по сезонам»). */
+      if (step.id === 'occasion' && answers.occasion === 'walk') {
+        if (!answers.season) answers.season = seasonByDate();
+        var seasonBox = el('div', 'wizard-season');
+        var seasonTitle = el('h3', 'wizard-subq');
+        seasonTitle.id = 'wizardSeasonTitle';
+        seasonTitle.textContent = 'Какое время года?';
+        seasonBox.appendChild(seasonTitle);
+        var seasonHint = el('p', 'wizard-step__hint wizard-season__hint');
+        seasonHint.textContent = 'Подберём верхнюю одежду и обувь по погоде.';
+        seasonBox.appendChild(seasonHint);
+        var seasonWrap = el('div', 'wizard-options wizard-options--compact wizard-season__options');
+        seasonWrap.setAttribute('role', 'radiogroup');
+        seasonWrap.setAttribute('aria-labelledby', 'wizardSeasonTitle');
+        var seasonButtons = [];
+        SEASONS.forEach(function (sOpt, i) {
+          var on = answers.season === sOpt.value;
+          var sBtn = el('button', 'wizard-option' + (on ? ' is-selected' : ''));
+          sBtn.type = 'button';
+          sBtn.textContent = sOpt.label;
+          sBtn.setAttribute('role', 'radio');
+          sBtn.setAttribute('aria-checked', on ? 'true' : 'false');
+          sBtn.tabIndex = on ? 0 : -1;
+          sBtn.addEventListener('click', function () { answers.season = sOpt.value; render(); focusSeason(sOpt.value); });
+          sBtn.addEventListener('keydown', function (e) {
+            var dir = (e.key === 'ArrowRight' || e.key === 'ArrowDown') ? 1 : (e.key === 'ArrowLeft' || e.key === 'ArrowUp') ? -1 : 0;
+            if (!dir) return;
+            e.preventDefault();
+            var next = SEASONS[(i + dir + SEASONS.length) % SEASONS.length].value;
+            answers.season = next;
+            render();
+            focusSeason(next);
+          });
+          seasonButtons.push(sBtn);
+          seasonWrap.appendChild(sBtn);
+        });
+        seasonBox.appendChild(seasonWrap);
+        root.appendChild(seasonBox);
+        canAdvance = !!answers.season;
+      }
     } else if (step.type === 'colortype') {
       root.appendChild(el('span', 'wizard-step__eyebrow', step.eyebrow));
       root.appendChild(el('h2', null, step.question));
@@ -1057,11 +1350,20 @@
     var layers = built.layers;
     root.appendChild(el('span', 'wizard-result__badge', 'Собрано по вашим ответам и фото'));
     root.appendChild(el('h2', null, 'Ваш образ по слоям'));
+    if (tpl.season) {
+      var offNote = offSeasonNote(tpl.season, answers.item);
+      if (offNote) {
+        var offEl = el('p', 'wizard-result__note wizard-season__warn');
+        offEl.textContent = offNote;
+        root.appendChild(offEl);
+      }
+    }
 
     var itemNote = answers.item ? 'Вещь: «' + escapeHtml(answers.item) + '». ' : '';
     root.appendChild(el('p', 'wizard-result__note',
       itemNote + 'Ваша вещь уже в образе, остальные слои алгоритм подобрал под повод «' +
-      tpl.title.toLowerCase() + '» и ваши ответы.'
+      tpl.title.toLowerCase() + '»' + (tpl.season ? ', сезон «' + seasonName(tpl.season) + '»' : '') +
+      ' и ваши ответы.'
     ));
 
     if (image) {
