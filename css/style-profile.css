@@ -1,0 +1,179 @@
+/* ============ Профиль стиля: подсказки, оценки, «Мой стиль» (ТЗ v5, разделы 7 и 10) ============ */
+
+/* подсказки под полем — как список браузера, но свои */
+.sp-suggest-wrap { position: relative; }
+.sp-suggest {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  z-index: 20;
+  margin: 4px 0 0;
+  padding: 6px 0;
+  list-style: none;
+  background: #fffdf8;
+  border: 1px solid rgba(123, 116, 168, 0.35);
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(32, 26, 61, 0.15);
+}
+.sp-suggest[hidden] { display: none; }
+.sp-suggest__item { display: flex; align-items: center; }
+.sp-suggest__item.is-active, .sp-suggest__item:hover { background: rgba(227, 189, 103, 0.18); }
+.sp-suggest__pick {
+  flex: 1 1 auto;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 10px 14px;
+  font-family: var(--font-body);
+  font-size: 0.98rem;
+  color: #201a3d;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sp-suggest__remove {
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  background: none;
+  border: none;
+  font-size: 1.3rem;
+  color: #8e88ad;
+  cursor: pointer;
+}
+.sp-suggest__remove:hover { color: #b23b3b; }
+
+.sp-prefilled {
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  color: var(--accent-gold-ink);
+  margin: -16px 0 18px;
+}
+.sp-remember { margin-top: 18px; }
+
+/* оценка образа */
+.sp-rate { font-family: var(--font-body); }
+.sp-rate__title { font-weight: 500; margin-bottom: 8px; color: var(--text-primary); }
+.sp-rate__row { display: flex; flex-wrap: wrap; gap: 8px; }
+.sp-rate__btn, .sp-rate__chip, .sp-rate__save {
+  border: 1px solid rgba(123, 116, 168, 0.45);
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: 999px;
+  padding: 8px 16px;
+  min-height: 38px;
+  font-family: var(--font-body);
+  font-size: 0.88rem;
+  color: #201a3d;
+  cursor: pointer;
+}
+.sp-rate__btn.is-selected, .sp-rate__chip.is-selected {
+  background: var(--accent-gold-ink);
+  border-color: var(--accent-gold-ink);
+  color: #fff;
+}
+.sp-rate__details { margin-top: 10px; }
+.sp-rate__details[hidden] { display: none; }
+.sp-rate__hint { font-size: 0.88rem; color: var(--text-muted); margin: 0 0 8px; }
+.sp-rate__chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.sp-rate__chip { padding: 6px 12px; min-height: 34px; font-size: 0.82rem; }
+.sp-rate__comment {
+  display: block;
+  width: 100%;
+  margin-bottom: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(123, 116, 168, 0.45);
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  box-sizing: border-box;
+}
+.sp-rate__comment[hidden] { display: none; }
+.sp-rate__save { background: var(--accent-gold-ink); border-color: var(--accent-gold-ink); color: #fff; }
+.sp-rate__status { font-size: 0.88rem; color: var(--text-muted); margin: 8px 0 0; min-height: 1em; }
+
+/* в тёмном окне крупного фото */
+.stil-lightbox__rate { margin: 0 0 16px; }
+.stil-lightbox .sp-rate__title { color: #f7f1e6; }
+.stil-lightbox .sp-rate__btn, .stil-lightbox .sp-rate__chip {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(247, 241, 230, 0.35);
+  color: #f7f1e6;
+}
+.stil-lightbox .sp-rate__btn.is-selected, .stil-lightbox .sp-rate__chip.is-selected {
+  background: #e3bd67;
+  border-color: #e3bd67;
+  color: #201a3d;
+}
+.stil-lightbox .sp-rate__hint, .stil-lightbox .sp-rate__status { color: rgba(247, 241, 230, 0.75); }
+.stil-lightbox .sp-rate__save { background: #e3bd67; border-color: #e3bd67; color: #201a3d; }
+
+/* отметка оценки на карточке */
+.saved-look-card__rating { text-transform: none; letter-spacing: 0; }
+.saved-look-card__rating.is-like { color: #b23b5a; }
+
+/* «Мой стиль» в кабинете */
+.sp-consent {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: var(--text-primary);
+  margin-bottom: 18px;
+  cursor: pointer;
+}
+.sp-consent input { width: 20px; height: 20px; margin-top: 2px; accent-color: var(--accent-gold-ink); flex: 0 0 auto; }
+.sp-cabinet {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+  margin-bottom: 16px;
+}
+.sp-card {
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.45);
+  border: 1px solid var(--glow-silver);
+  padding: 16px 18px;
+  font-family: var(--font-body);
+}
+.sp-card__title { font-family: var(--font-display); font-weight: 500; font-size: 1.25rem; margin: 0 0 10px; color: var(--text-primary); }
+.sp-card__empty, .sp-card__line { font-size: 0.92rem; line-height: 1.5; color: var(--text-muted); margin: 0 0 6px; }
+.sp-card__line { color: var(--text-primary); }
+.sp-list { list-style: none; margin: 0 0 8px; padding: 0; }
+.sp-list__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(123, 116, 168, 0.15);
+  font-size: 0.92rem;
+  color: var(--text-primary);
+}
+.sp-list__item span { overflow-wrap: anywhere; }
+.sp-list__remove {
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: none;
+  font-size: 1.2rem;
+  color: #8e88ad;
+  cursor: pointer;
+}
+.sp-list__remove:hover { color: #b23b3b; }
+.sp-link {
+  background: none;
+  border: none;
+  padding: 6px 0;
+  font-family: var(--font-body);
+  font-size: 0.88rem;
+  color: var(--accent-gold-ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.sp-link--danger { color: #b23b3b; }

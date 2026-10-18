@@ -1095,3 +1095,56 @@ body:has(.page-cta) {
     padding: 16px 28px;
   }
 }
+
+/* ---------- «Образ по фото»: заметка, «Что вы получите», цена (2026-10-17) ---------- */
+.hero-note {
+  font-family: var(--font-body);
+  font-style: italic;
+  font-size: 1rem;
+  line-height: 1.6;
+  color: var(--text-primary);
+  max-width: 600px;
+  margin: -12px auto 24px;
+  padding: 12px 18px;
+  border: 1px solid var(--glow-gold);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.45);
+}
+.hero-gets {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  max-width: 700px;
+  margin: 0 auto 20px;
+  padding: 0;
+  text-align: left;
+}
+.hero-gets li {
+  flex: 1 1 200px;
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  line-height: 1.45;
+  color: var(--text-primary);
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.5);
+  border: 1px solid var(--glow-gold);
+}
+.hero-gets b {
+  display: block;
+  font-weight: 500;
+  color: var(--accent-gold-ink);
+  margin-bottom: 2px;
+}
+@media (max-width: 600px) {
+  .hero-gets li { flex-basis: 140px; }
+}
+.hero-price {
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 1.05rem;
+  color: var(--text-primary);
+  margin: 0 0 8px;
+}

@@ -25,7 +25,8 @@
 <link rel="stylesheet" href="css/components/button-3d.css?v=3">
 <link rel="stylesheet" href="css/inner.css?v=28">
 <link rel="stylesheet" href="css/wizard.css?v=6">
-<link rel="stylesheet" href="css/cabinet.css?v=6">
+<link rel="stylesheet" href="css/cabinet.css?v=7">
+<link rel="stylesheet" href="css/style-profile.css?v=1">
 </head>
 <body>
 
@@ -36,7 +37,6 @@
     <nav class="page-header__nav" id="page-nav">
       <a href="how-it-works.html">Как это работает</a>
       <a href="obraz-po-foto.html">Образ по фото</a>
-      <a href="online-stylist.html">Онлайн-стилист</a>
       <a href="primerka.html">Примерка</a>
       <a href="prices.html">Цены</a>
       <a href="faq.html">FAQ</a>
@@ -139,10 +139,20 @@
   <section class="page-section" id="savedLooksSection" style="display:none">
     <h2 class="page-section__title">Мои образы</h2>
     <p class="section-note">
-      Здесь остаются образы, собранные в «Онлайн-стилисте» и «Образе по фото» — можно вернуться к ним
-      позже или удалить безвозвратно, если больше не нужны.
+      Здесь хранятся ваши образы. Вернитесь к ним, когда понадобится, или удалите ненужные —
+      по одному или сразу несколько.
     </p>
     <div class="saved-looks-grid" id="savedLooksGrid"></div>
+  </section>
+
+  <section class="page-section" id="styleProfileSection" style="display:none">
+    <h2 class="page-section__title">Мой стиль</h2>
+    <p class="section-note">
+      Что сервис запомнил о вас: оценки образов, ответы анкеты и подсказки для полей.
+      Оценивайте образы — с каждым разом стилист точнее попадает в ваш вкус.
+      Любой пункт можно удалить.
+    </p>
+    <div id="styleProfileRoot"></div>
   </section>
 
   <section class="page-section">
@@ -197,7 +207,6 @@
       <h4>Продукт</h4>
       <a href="how-it-works.html">Как это работает</a>
       <a href="obraz-po-foto.html">Образ по фото</a>
-      <a href="online-stylist.html">Онлайн-стилист</a>
       <a href="primerka.html">Программа «Примерка»</a>
       <a href="prices.html">Цены</a>
       <a href="cabinet.html">Личный кабинет</a>
@@ -224,9 +233,10 @@
 </footer>
 
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-<script src="js/saved-looks.js"></script>
-<script src="js/wallet.js"></script>
-<script src="js/cabinet.js"></script>
+<script src="js/style-profile.js?v=1"></script>
+<script src="js/saved-looks.js?v=2"></script>
+<script src="js/wallet.js?v=2"></script>
+<script src="js/cabinet.js?v=2"></script>
 <script src="js/nav-active.js"></script>
 <script src="js/nav-toggle.js"></script>
 </body>

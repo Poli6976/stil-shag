@@ -5,8 +5,10 @@
    предыдущем шаге (api/analyze-item.js) и подставленное сюда через applyItemToLayers.
    2026-10-06 — добавлены карточка цветотипа (шаг "colors": 3 вопроса → палитра «идёт / лучше
    избегать», считается здесь же правилами, без ИИ) и снова картинка: рисованная модель ТИПАЖА
-   клиентки (цвет волос из анкеты, фигура по размеру) — api/looks/charge.js. Образ на её
-   собственном фото — отдельный продукт («Онлайн-стилист», api/compose-look.js). */
+   клиентки (цвет волос из анкеты, фигура по размеру) — api/looks/charge.js.
+   2026-10-17 (ТЗ v5) — фото теперь ожидается С ЧЕЛОВЕКОМ в вещи (вариант А): переключатель
+   «для кого» убран (forWhom всегда 'self' → женские шаблоны; мужские оставлены в коде на будущее),
+   подростковый режим по-прежнему включается шагом «age». Страница «Онлайн-стилист» скрыта. */
 
 (function () {
   var STEPS = [
@@ -499,6 +501,38 @@
   var stepIndex = 0;
   var currentSession = null;
 
+  /* Профиль стиля (ТЗ v5, разделы 7 и 10; js/style-profile.js + api/looks/saved.js).
+     null — сервер профиля недоступен (например, SQL ещё не применён): анкета работает как раньше. */
+  var profile = null;
+  var prefilled = {};
+  var SP = window.stilStyleProfile || null;
+  var PROFILE_ANSWER_KEYS = ['hair', 'metal', 'sun', 'style'];
+
+  function applyProfileAnswers() {
+    prefilled = {};
+    if (!profile || !profile.remember || !profile.answers) return;
+    PROFILE_ANSWER_KEYS.forEach(function (key) {
+      if (profile.answers[key] && !answers[key]) {
+        answers[key] = profile.answers[key];
+        prefilled[key] = true;
+      }
+    });
+  }
+
+  function prefilledNote(keys) {
+    var any = keys.some(function (k) { return prefilled[k] && answers[k] === (profile && profile.answers[k]); });
+    if (!any) return null;
+    return el('p', 'sp-prefilled', 'Ответы с прошлого раза — можно изменить.');
+  }
+
+  /* Короткая версия описания вещи для подсказок: первое предложение, до 120 символов. */
+  function shortItem(text) {
+    var t = String(text || '').trim();
+    var dot = t.search(/[.!?](\s|$)/);
+    if (dot > 0) t = t.slice(0, dot);
+    return t.slice(0, 120);
+  }
+
   var root = document.getElementById('wizardStep');
   var progressLabel = document.getElementById('wizardProgressLabel');
   var progressFill = document.getElementById('wizardProgressFill');
@@ -588,7 +622,8 @@
         return res.json();
       })
       .then(function (data) {
-        renderResult(built, data && data.image);
+        renderResult(built, data && data.image, data && data.savedLookId);
+        rememberAfterResult();
       })
       .catch(function (err) {
         root.innerHTML = '';
@@ -612,7 +647,49 @@
   function restart() {
     answers = {};
     stepIndex = 0;
+    applyProfileAnswers();
     render();
+  }
+
+  /* После готового образа — сохранить ответы и подсказки в профиль (сервер сам проверит согласие). */
+  function rememberAfterResult() {
+    if (!SP || !profile || !profile.remember || !currentSession) return;
+    var payload = {
+      action: 'remember',
+      item: shortItem(answers.item),
+      fit: (answers.fit || '').trim(),
+      fitConsent: !!answers.fitConsent,
+      isTeen: answers.age === 'teen',
+      answers: {}
+    };
+    PROFILE_ANSWER_KEYS.forEach(function (k) { if (answers[k]) payload.answers[k] = answers[k]; });
+    SP.action(currentSession, payload)
+      .then(function (data) { if (data && data.profile) profile = data.profile; })
+      .catch(function () {});
+  }
+
+  /* «Что докупить» без вещей, которые уже есть: ответ на вопрос о гардеробе + «Уже есть» из
+     «Моего гардероба» в кабинете (localStorage). Сравнение по началу слов (5 букв) — грубо, но без ИИ. */
+  function ownedText() {
+    var parts = [answers.wardrobe || ''];
+    try {
+      var items = JSON.parse(localStorage.getItem('stil.wardrobe') || '[]');
+      items.forEach(function (it) { if (it && it.status === 'have' && it.text) parts.push(it.text); });
+    } catch (e) {}
+    return parts.join(' ').toLowerCase();
+  }
+  function stems(text) {
+    return (text.toLowerCase().match(/[а-яё]{5,}/g) || []).map(function (w) { return w.slice(0, 5); });
+  }
+  function filterOwned(products) {
+    var owned = stems(ownedText());
+    if (!owned.length) return { keep: products, owned: [] };
+    var keep = [], skipped = [];
+    products.forEach(function (p) {
+      var first = stems(p.name)[0];
+      if (first && owned.indexOf(first) !== -1) skipped.push(p); else keep.push(p);
+    });
+    return { keep: keep, owned: skipped };
   }
 
   function render() {
@@ -626,20 +703,10 @@
     if (step.type === 'start') {
       root.appendChild(el('span', 'wizard-step__eyebrow', 'Быстрый старт'));
       root.appendChild(el('h2', null, 'Вокруг какой вещи соберём образ?'));
-      root.appendChild(el('p', 'wizard-step__hint', 'Подойдёт любая — та, что уже купили у партнёра, та, что давно лежит в шкафу, или та, что просто приглянулась. Опишите её своими словами, этого достаточно, чтобы начать.'));
+      root.appendChild(el('p', 'wizard-step__hint', 'Подойдёт любая: купленная у партнёра, давно лежащая в шкафу или просто приглянувшаяся. Опишите её в паре слов и загрузите фото, где она на вас.'));
 
-      var toggleWrap = el('div', 'wizard-toggle');
-      FOR_WHOM.forEach(function (opt) {
-        var btn = el('button', 'wizard-toggle__opt' + (answers.forWhom === opt.value ? ' is-selected' : ''), opt.label);
-        btn.type = 'button';
-        btn.addEventListener('click', function () {
-          answers.forWhom = opt.value;
-          render();
-        });
-        toggleWrap.appendChild(btn);
-      });
-      if (!answers.forWhom) { answers.forWhom = 'self'; }
-      root.appendChild(toggleWrap);
+      /* Переключатель «для кого» убран по ТЗ v5 — образ собирается по человеку на фото. */
+      answers.forWhom = 'self';
 
       var itemField = el('div', 'wizard-field');
       var itemLabel = el('label', null, 'Вещь');
@@ -655,17 +722,29 @@
       itemField.appendChild(itemLabel);
       itemField.appendChild(itemInput);
       root.appendChild(itemField);
+      if (SP && profile) {
+        SP.attachSuggestions(itemInput, {
+          getItems: function () { return profile.itemHistory || []; },
+          onRemove: function (value) {
+            profile.itemHistory = (profile.itemHistory || []).filter(function (v) { return v !== value; });
+            return SP.action(currentSession, { action: 'forget-suggestion', kind: 'item', value: value });
+          }
+        });
+      }
 
       var photoField = el('div', 'wizard-field');
-      photoField.appendChild(el('label', null, 'Фото вещи'));
+      photoField.appendChild(el('label', null, 'Фото в этой вещи'));
+      photoField.appendChild(el('p', 'wizard-step__hint wizard-photo-hint',
+        'На фото — вы или другой человек в этой вещи. Лучше, чтобы вещь была видна целиком.'));
 
       var photoConsentWrap = el('label', 'wizard-consent');
       var photoConsentCheckbox = document.createElement('input');
       photoConsentCheckbox.type = 'checkbox';
       photoConsentWrap.appendChild(photoConsentCheckbox);
       photoConsentWrap.appendChild(el('span', null,
-        'Согласен(на) на обработку фото вещи сервисом распознавания изображений — фото ' +
-        'не хранится на сайте после ответа. Подробнее — ' +
+        'Согласен(на) на обработку фото (включая внешность) и параметров тела для сборки образа: ' +
+        'GigaChat (Сбер, Россия) распознаёт вещь, FLUX (Black Forest Labs, Германия и США) рисует ' +
+        'картинку — для этого фото передаётся за рубеж. Фото не хранится у нас после ответа. Подробнее — ' +
         '<a href="legal-privacy.html" target="_blank" rel="noopener">Политика конфиденциальности</a>.'
       ));
       photoField.appendChild(photoConsentWrap);
@@ -693,7 +772,7 @@
       photoRow.appendChild(photoPreview);
       photoRow.appendChild(photoRemoveBtn);
 
-      var DEFAULT_PHOTO_HINT = 'Разберём фото и сами впишем описание в поле выше — его всегда можно поправить.';
+      var DEFAULT_PHOTO_HINT = 'Разберём фото и сами заполним описание вещи — его всегда можно поправить.';
       var photoStatus = el('p', 'wizard-photo-status', DEFAULT_PHOTO_HINT);
 
       function resetPhoto() {
@@ -738,7 +817,7 @@
                 'Content-Type': 'application/json',
                 'Authorization': 'Bearer ' + (currentSession ? currentSession.access_token : '')
               },
-              body: JSON.stringify({ image: dataUrl })
+              body: JSON.stringify({ image: dataUrl, hint: (answers.item || '').trim().slice(0, 80) })
             });
           })
           .then(function (res) {
@@ -782,11 +861,33 @@
       linkField.appendChild(linkInput);
       root.appendChild(linkField);
 
+      if (SP && profile) {
+        var rememberWrap = el('label', 'wizard-consent sp-remember');
+        var rememberBox = document.createElement('input');
+        rememberBox.type = 'checkbox';
+        rememberBox.checked = !!profile.remember;
+        rememberWrap.appendChild(rememberBox);
+        rememberWrap.appendChild(el('span', null,
+          'Запоминать мои ответы и подсказки, чтобы следующие образы собирались быстрее и точнее. ' +
+          'Управлять этим можно в <a href="cabinet.html#styleProfileSection">личном кабинете</a>.'));
+        rememberBox.addEventListener('change', function () {
+          var value = rememberBox.checked;
+          rememberBox.disabled = true;
+          SP.action(currentSession, { action: 'set-remember', value: value })
+            .then(function (data) { if (data && data.profile) profile = data.profile; })
+            .catch(function () { rememberBox.checked = !value; })
+            .then(function () { rememberBox.disabled = false; });
+        });
+        root.appendChild(rememberWrap);
+      }
+
       canAdvance = !!(answers.item && answers.item.trim());
     } else if (step.type === 'select') {
       root.appendChild(el('span', 'wizard-step__eyebrow', step.eyebrow));
       root.appendChild(el('h2', null, step.question));
       if (step.hint) root.appendChild(el('p', 'wizard-step__hint', step.hint));
+      var selNote = prefilledNote([step.id]);
+      if (selNote) root.appendChild(selNote);
 
       var optWrap = el('div', 'wizard-options');
       step.options.forEach(function (opt) {
@@ -806,6 +907,8 @@
       root.appendChild(el('span', 'wizard-step__eyebrow', step.eyebrow));
       root.appendChild(el('h2', null, step.question));
       if (step.hint) root.appendChild(el('p', 'wizard-step__hint', step.hint));
+      var colorNote = prefilledNote(['hair', 'metal', 'sun']);
+      if (colorNote) root.appendChild(colorNote);
 
       COLOR_QUESTIONS.forEach(function (q) {
         var subq = el('h3', 'wizard-subq');
@@ -837,11 +940,30 @@
       if (step.hint) root.appendChild(el('p', 'wizard-step__hint', step.hint));
 
       var field = el('div', 'wizard-field');
-      var input = el('textarea', 'wizard-textarea');
+      /* «Рост и размер» — однострочное поле с подсказками из кабинета (ТЗ v5, раздел 7);
+         подсказки браузера выключены, чтобы под полем не открывались два списка. */
+      var input;
+      if (step.id === 'fit') {
+        input = el('input', 'wizard-input');
+        input.type = 'text';
+        input.maxLength = 120;
+        input.setAttribute('autocomplete', 'off');
+      } else {
+        input = el('textarea', 'wizard-textarea');
+      }
       input.placeholder = step.placeholder || '';
       input.value = answers[step.id] || '';
       field.appendChild(input);
       root.appendChild(field);
+      if (step.id === 'fit' && SP && profile) {
+        SP.attachSuggestions(input, {
+          getItems: function () { return profile.fitHistory || []; },
+          onRemove: function (value) {
+            profile.fitHistory = (profile.fitHistory || []).filter(function (v) { return v !== value; });
+            return SP.action(currentSession, { action: 'forget-suggestion', kind: 'fit', value: value });
+          }
+        });
+      }
 
       var fitConsentCheckbox = null;
       if (step.sensitive) {
@@ -915,7 +1037,7 @@
     } catch (e) {}
   }
 
-  function renderResult(built, image) {
+  function renderResult(built, image, savedLookId) {
     bumpStyleCount();
 
     progressLabel.textContent = 'Готово';
@@ -925,21 +1047,20 @@
 
     var tpl = built.tpl;
     var layers = built.layers;
-    root.appendChild(el('span', 'wizard-result__badge', 'Собрано алгоритмом по вашим ответам и фото вещи'));
+    root.appendChild(el('span', 'wizard-result__badge', 'Собрано по вашим ответам и фото'));
     root.appendChild(el('h2', null, 'Ваш образ по слоям'));
 
     var itemNote = answers.item ? 'Вещь: «' + escapeHtml(answers.item) + '». ' : '';
     root.appendChild(el('p', 'wizard-result__note',
       itemNote + 'Ваша вещь уже в образе, остальные слои алгоритм подобрал под повод «' +
-      tpl.title.toLowerCase() + '» и ваши ответы. Образ прямо на вашем собственном фото — на ' +
-      '«Онлайн-стилисте», отдельным продуктом.'
+      tpl.title.toLowerCase() + '» и ваши ответы.'
     ));
 
     if (image) {
       var imageNote = el('p', 'wizard-result__note');
-      imageNote.textContent = 'Картинка — ориентир, как может выглядеть образ целиком: рисованная модель, ' +
-        'а не вы сами. Если на фото вещи есть человек, модель похожего с ним типажа; если вещь снята ' +
-        'отдельно — модель вашего типажа по ответам анкеты.';
+      imageNote.textContent = 'Картинка — ориентир, как может выглядеть образ целиком: художественный набросок ' +
+        'на условной модели, а не ваше фото. Модель похожего типажа с человеком на фото; если фото не было — ' +
+        'вашего типажа по ответам анкеты.';
       root.appendChild(imageNote);
       var img = document.createElement('img');
       img.className = 'wizard-result-image';
@@ -972,7 +1093,14 @@
       'хватает для образа. Покупать ли, что и где — решаете только вы, сайт в этом не участвует.'
     ));
     var grid = el('div', 'wizard-products');
-    tpl.products.forEach(function (p) {
+    var split = filterOwned(tpl.products);
+    if (split.owned.length) {
+      var ownedNote = el('p', 'wizard-result__note');
+      ownedNote.textContent = 'Уже есть у вас — не добавляем: ' + split.owned.map(function (p) { return p.name.toLowerCase(); }).join(', ') + '.';
+      productsBlock.appendChild(ownedNote);
+    }
+    if (!split.keep.length) productsBlock.appendChild(el('p', 'wizard-result__note', 'Всё нужное для этого образа у вас уже есть.'));
+    split.keep.forEach(function (p) {
       var card = el('div', 'wizard-product');
       card.appendChild(el('h4', null, p.name));
       card.appendChild(el('p', null, p.note));
@@ -980,6 +1108,14 @@
     });
     productsBlock.appendChild(grid);
     root.appendChild(productsBlock);
+
+    if (SP && profile && savedLookId && currentSession) {
+      var rateWrap = el('div', 'wizard-result__block');
+      SP.renderRating(rateWrap, currentSession, savedLookId, null);
+      rateWrap.appendChild(el('p', 'wizard-result__note',
+        'Оценивайте образы — с каждым разом стилист точнее попадает в ваш вкус. Оценки видны в личном кабинете.'));
+      root.appendChild(rateWrap);
+    }
 
     renderRestartLinks();
   }
@@ -1077,7 +1213,14 @@
       currentSession = session;
       var progressWrap = document.getElementById('wizardProgressWrap');
       if (progressWrap) progressWrap.style.display = '';
-      render();
+      if (!SP) { render(); return; }
+      SP.getProfile(session)
+        .then(function (data) { profile = (data && data.profile) || null; })
+        .catch(function () { profile = null; })
+        .then(function () {
+          if (stepIndex === 0) applyProfileAnswers();
+          render();
+        });
     });
   } else {
     render();

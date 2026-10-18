@@ -239,6 +239,8 @@
       renderAvatar(null);
       var savedLooksSection = document.getElementById('savedLooksSection');
       if (savedLooksSection) savedLooksSection.style.display = 'none';
+      var styleProfileSection = document.getElementById('styleProfileSection');
+      if (styleProfileSection) styleProfileSection.style.display = 'none';
       var loginForm = document.getElementById('loginForm');
       if (loginForm) loginForm.style.display = '';
       var codeForm = document.getElementById('loginCodeForm');

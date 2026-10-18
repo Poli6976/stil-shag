@@ -532,3 +532,8 @@
     font-size: 0.68rem;
   }
 }
+
+/* подсказка под «Фото в этой вещи» (ТЗ v5) */
+.wizard-photo-hint {
+  margin: 4px 0 12px;
+}

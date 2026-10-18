@@ -31,7 +31,9 @@ const { requireUser } = require('../lib/auth');
 const { getAccessToken, uploadFile, chatWithImage } = require('../lib/gigachat');
 
 const SYSTEM_PROMPT =
-  'Ты — ассистент стилиста. Тебе показывают фото одной вещи одежды или аксессуара. ' +
+  'Ты — ассистент стилиста. Тебе показывают фото вещи одежды или аксессуара — часто она надета ' +
+  'на человека вместе с другими вещами. Описывай ТОЛЬКО одну вещь: ту, что названа в подсказке ' +
+  'пользователя, а если подсказки нет — самую заметную. Остальную одежду на человеке не описывай. ' +
   'Опиши её кратко и по делу в 2-4 предложениях: тип вещи, цвет, крой/силуэт, ткань или ' +
   'фактура (если видно), заметные детали (принт, декор, длина). Пиши как для карточки ' +
   'товара — начни СРАЗУ с названия вещи (например «Рубашка в клетку, зелёно-белая...»), ' +
@@ -106,7 +108,11 @@ module.exports = async function handler(req, res) {
 
     var token = await getAccessToken();
     var fileId = await uploadFile(token, imageBuffer, mime);
-    var parsed = splitPersonLine(await chatWithImage(token, SYSTEM_PROMPT, 'Опиши вещь на фото.', fileId));
+    /* 2026-10-17 (ТЗ v5): на фото теперь обычно человек в нескольких вещах — подсказка клиентки из поля
+       «Вещь» говорит, какую из них описывать. Только текст, обрезан до 80 символов, без управляющих знаков. */
+    var hint = typeof body.hint === 'string' ? body.hint.replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, 80) : '';
+    var userMsg = hint ? 'Опиши на фото вещь, которую пользователь назвал так: «' + hint + '».' : 'Опиши вещь на фото.';
+    var parsed = splitPersonLine(await chatWithImage(token, SYSTEM_PROMPT, userMsg, fileId));
     console.log('analyze-item: человек на фото —', parsed.hasPerson);
 
     res.status(200).json({ description: parsed.description, hasPerson: parsed.hasPerson });

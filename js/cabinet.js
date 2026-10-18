@@ -55,7 +55,7 @@
     root.appendChild(msg);
 
     msg.innerHTML = 'Примерка — 998 ₽, или 499 ₽ по коду партнёра. ' +
-      '<a href="online-stylist.html">Собрать образ →</a>. После оплаты — бесплатные образы в подарок.';
+      '<a href="obraz-po-foto.html">Собрать образ →</a>. После оплаты — бесплатные образы в подарок.';
 
     if (!window.stilAuth) return;
     window.stilAuth.getSession()
@@ -137,12 +137,58 @@
     });
   }
 
+  /* 2026-10-17 (ТЗ v5, раздел 8): выбор нескольких вещей галочками и удаление группой. */
+  var wardrobeSelected = {};
+
+  function renderWardrobeBulk(items) {
+    var haveList = document.getElementById('wardrobeHave');
+    var columns = haveList && haveList.closest('.wardrobe-columns');
+    if (!columns) return;
+    var bar = document.getElementById('wardrobeBulk');
+    if (!bar) {
+      bar = el('div', 'wardrobe-bulk');
+      bar.id = 'wardrobeBulk';
+      columns.parentNode.insertBefore(bar, columns);
+    }
+    bar.innerHTML = '';
+    var ids = items.map(function (it) { return it.id; });
+    var chosen = ids.filter(function (id) { return wardrobeSelected[id]; });
+    bar.hidden = !items.length;
+    bar.appendChild(el('span', null, chosen.length ? 'Выбрано: ' + chosen.length : 'Отметьте вещи, чтобы удалить несколько сразу'));
+    var all = el('button', 'saved-looks-toolbar__btn', chosen.length === ids.length && ids.length ? 'Снять выбор' : 'Выбрать все');
+    all.type = 'button';
+    all.addEventListener('click', function () {
+      var allOn = chosen.length === ids.length;
+      wardrobeSelected = {};
+      if (!allOn) ids.forEach(function (id) { wardrobeSelected[id] = true; });
+      renderWardrobe();
+    });
+    bar.appendChild(all);
+    if (chosen.length) {
+      var del = el('button', 'saved-looks-toolbar__btn saved-looks-toolbar__delete', 'Удалить выбранные');
+      del.type = 'button';
+      del.addEventListener('click', function () {
+        var ask = window.stilSavedLooks && window.stilSavedLooks.confirmDialog
+          ? window.stilSavedLooks.confirmDialog('Удалить вещи из гардероба?', 'Выбрано: ' + chosen.length + '. Отменить это действие нельзя.', 'Удалить')
+          : Promise.resolve(window.confirm('Удалить выбранные вещи?'));
+        ask.then(function (yes) {
+          if (!yes) return;
+          writeWardrobe(readWardrobe().filter(function (it) { return !wardrobeSelected[it.id]; }));
+          wardrobeSelected = {};
+          renderWardrobe();
+        });
+      });
+      bar.appendChild(del);
+    }
+  }
+
   function renderWardrobe() {
     var haveList = document.getElementById('wardrobeHave');
     var needList = document.getElementById('wardrobeNeed');
     if (!haveList || !needList) return;
 
     var items = readWardrobe();
+    renderWardrobeBulk(items);
     haveList.innerHTML = '';
     needList.innerHTML = '';
 
@@ -158,6 +204,16 @@
 
   function renderItem(item) {
     var li = el('li', 'wardrobe-item');
+    var check = document.createElement('input');
+    check.type = 'checkbox';
+    check.className = 'wardrobe-item__check';
+    check.checked = !!wardrobeSelected[item.id];
+    check.setAttribute('aria-label', 'Выбрать: ' + item.text);
+    check.addEventListener('change', function () {
+      if (check.checked) wardrobeSelected[item.id] = true; else delete wardrobeSelected[item.id];
+      renderWardrobe();
+    });
+    li.appendChild(check);
     li.appendChild(el('span', null, item.text));
 
     var toggle = el('button', 'wardrobe-item__toggle', item.status === 'have' ? 'Нужно докупить' : 'Уже есть');
