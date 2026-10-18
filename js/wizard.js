@@ -725,6 +725,9 @@
         setNextEnabled(!!answers.item.trim());
       });
       itemField.appendChild(itemLabel);
+      /* 2026-10-19 — живой тест: ИИ называл цвет джемпера то «голубой», то «фиолетовый», и картинка
+         рисовалась этим цветом, а не цветом с фото. Просим клиентку уточнить цвет словами. */
+      itemField.appendChild(el('p', 'wizard-step__hint', 'Уточните цвет вещи — по описанию рисуется картинка.'));
       itemField.appendChild(itemInput);
       root.appendChild(itemField);
       if (SP && profile) {
@@ -838,7 +841,7 @@
             answers.itemHasPerson = typeof data.hasPerson === 'boolean' ? data.hasPerson : null;
             itemInput.value = answers.item;
             setNextEnabled(!!answers.item.trim());
-            photoStatus.textContent = 'Готово — можно поправить текст вручную, если нужно.';
+            photoStatus.textContent = 'Готово — проверьте описание и уточните цвет вещи, если он неточный.';
             photoStatus.className = 'wizard-photo-status wizard-photo-status--ok';
           })
           .catch(function (err) {
