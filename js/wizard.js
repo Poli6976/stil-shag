@@ -1382,9 +1382,13 @@
     var layersBlock = el('div', 'wizard-result__block');
     layersBlock.appendChild(el('div', 'wizard-result__block-title', '👕 Образ по слоям'));
     var dl = el('dl', 'wizard-layers');
+    /* Платье стоит в «Верх» и «Низ» одной строкой (так его узнаёт картинка) — показываем одной строкой. */
+    var dressSuffix = ' (выполняет роль верха и низа)';
+    var isDress = layers['Верх'] && layers['Верх'] === layers['Низ'] && layers['Верх'].indexOf(dressSuffix) !== -1;
     Object.keys(layers).forEach(function (key) {
-      dl.appendChild(el('dt', null, key));
-      dl.appendChild(el('dd', null, layers[key]));
+      if (isDress && key === 'Низ') return;
+      dl.appendChild(el('dt', null, isDress && key === 'Верх' ? 'Платье' : key));
+      dl.appendChild(el('dd', null, isDress && key === 'Верх' ? layers[key].replace(dressSuffix, '') : layers[key]));
     });
     layersBlock.appendChild(dl);
     root.appendChild(layersBlock);

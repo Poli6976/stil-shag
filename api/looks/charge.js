@@ -155,13 +155,23 @@ function splitItemLayers(layers) {
   var itemKey = null;
   var wrappedCount = 0;
   var rest = [];
+  var isWinter = /зима/.test(layers['Сезон'] || '');
   /* «Аксессуары» смотрим только как вещь клиентки (js/wizard.js с 2026-10-19 узнаёт сумку/шарф/рюкзак);
      строку шаблона аксессуаров в картинку не берём, как и раньше. */
   ['Верх', 'Низ', 'Верхняя одежда', 'Обувь', 'Аксессуары'].forEach(function (k) {
     if (!layers[k]) return;
     var value = unescapeHtml(layers[k]);
     var m = WRAPPED_ITEM_RE.exec(value);
-    if (!m && k === 'Аксессуары') return;
+    if (!m && k === 'Аксессуары') {
+      /* 2026-10-19 — исключение для зимней «Прогулки»: без шарфа и шапки картинка не выглядит зимней
+         (живой тест — пальто поверх платья, ни шапки, ни шарфа). Водолазку «под платье» в картинку не
+         берём: FLUX.2 закроет ею вырез вещи клиентки. */
+      if (isWinter) {
+        var winterAcc = value.split(/,\s*/).filter(function (p) { return p && !/водолазк/i.test(p); });
+        if (winterAcc.length) rest.push('аксессуары — ' + winterAcc.join(', ').toLowerCase());
+      }
+      return;
+    }
     if (m) {
       wrappedCount++;
       /* 2026-10-07 — живой тест: «надписью "MOSCHINO"» в описании → BFL отклонил запрос

@@ -28,11 +28,25 @@
     toolbar: null
   };
 
+  /* 2026-10-19 — платье записано в «Верх» и «Низ» одной и той же строкой с пометкой «(выполняет роль
+     верха и низа)» (так её узнаёт картинка, api/looks/charge.js). Показываем одной строкой «Платье». */
+  var DRESS_SUFFIX = ' (выполняет роль верха и низа)';
+  function displayLayers(layers, labels) {
+    var isDress = layers['Верх'] && layers['Верх'] === layers['Низ'] &&
+      layers['Верх'].indexOf(DRESS_SUFFIX) !== -1;
+    var out = [];
+    labels.forEach(function (key) {
+      if (!layers[key]) return;
+      if (isDress && key === 'Низ') return;
+      if (isDress && key === 'Верх') { out.push(['Платье', layers[key].replace(DRESS_SUFFIX, '')]); return; }
+      out.push([key, layers[key]]);
+    });
+    return out;
+  }
+
   function buildTelegramCaption(look) {
-    var layers = look.layers || {};
-    var lines = TELEGRAM_LAYER_LABELS
-      .filter(function (key) { return layers[key]; })
-      .map(function (key) { return key + ': ' + layers[key]; });
+    var lines = displayLayers(look.layers || {}, TELEGRAM_LAYER_LABELS)
+      .map(function (pair) { return pair[0] + ': ' + pair[1]; });
     return 'Новый образ 👇\n' + lines.join('\n') +
       '\n\nСвою вещь разберём точно так же — 998 ₽, и два следующих образа бесплатно → https://stil-shag.ru/how-it-works.html';
   }
@@ -121,10 +135,8 @@
   }
 
   function layersText(look) {
-    var layers = look.layers || {};
-    return LAYER_LABELS
-      .filter(function (key) { return layers[key]; })
-      .map(function (key) { return key + ': ' + layers[key]; })
+    return displayLayers(look.layers || {}, LAYER_LABELS)
+      .map(function (pair) { return pair[0] + ': ' + pair[1]; })
       .join(' · ');
   }
 
@@ -475,11 +487,9 @@
       date.textContent = formatDate(look.createdAt) + seasonSuffix(look);
       counter.textContent = withImages.length > 1 ? (current + 1) + ' из ' + withImages.length : '';
       list.innerHTML = '';
-      var layers = look.layers || {};
-      LAYER_LABELS.forEach(function (key) {
-        if (!layers[key]) return;
-        list.appendChild(el('dt', null, key));
-        list.appendChild(el('dd', null, layers[key]));
+      displayLayers(look.layers || {}, LAYER_LABELS).forEach(function (pair) {
+        list.appendChild(el('dt', null, pair[0]));
+        list.appendChild(el('dd', null, pair[1]));
       });
       why.textContent = look.why || '';
       why.hidden = !look.why;
