@@ -104,7 +104,7 @@
     <h2 class="page-section__title">Код от партнёра</h2>
     <p class="section-note">
       Купили вещь у партнёра — продавец сам расскажет о программе и даст вам код. Введите его здесь,
-      и скидка на следующую примерку включится автоматически, без переходов и подтверждений.
+      и следующий образ обойдётся в 370 ₽ вместо 590 ₽ — без переходов и подтверждений.
     </p>
     <form class="wardrobe-add" id="codeForm">
       <input type="text" id="codeInput" placeholder="Например: STIL-ANNA1-7F3K9QXM" autocomplete="off">
@@ -118,21 +118,17 @@
   </section>
 
   <section class="page-section" id="walletSection" style="display:none">
-    <h2 class="page-section__title">Баланс</h2>
+    <h2 class="page-section__title">Мои покупки</h2>
     <div class="cabinet-status">
-      <div class="cabinet-status__count" id="walletBalance">—</div>
-      <p class="cabinet-status__msg">Депозит списывается автоматически при оплате «Примерки» или «Образа по фото».</p>
+      <div class="cabinet-status__count" id="walletStock">Образов в запасе: —</div>
     </div>
-    <div class="wardrobe-add">
-      <button type="button" id="cardPayBtn" class="btn-3d btn-3d--rect">Оплатить</button>
+    <div class="wardrobe-add cabinet-packs">
+      <button type="button" class="btn-3d btn-3d--rect" data-pack="PACK_3">3 образа — 1 200 ₽</button>
+      <button type="button" class="btn-3d btn-3d--rect" data-pack="PACK_5">5 образов — 1 850 ₽</button>
     </div>
-    <p class="section-note">
-      Сумма (998 ₽, или 499 ₽ со скидкой по коду партнёра) подставляется автоматически — вводить
-      ничего не нужно.
-    </p>
     <div id="topupMsg" class="cabinet-status__msg" style="display:none"></div>
 
-    <h3>История операций</h3>
+    <h3>Оплаты</h3>
     <ul class="wardrobe-list" id="walletHistory"></ul>
   </section>
 

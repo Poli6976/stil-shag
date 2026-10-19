@@ -27,10 +27,18 @@
    «штрихами» и накладными карманами YandexART нарисовал коротким свитером с косами — он видит только
    описание GigaChat, а в описании ни длины, ни карманов, ни рисунка. Модель по-прежнему рисованная
    (типаж из анкеты), с фото берётся только вещь. При любой ошибке FLUX.2 — прежний YandexART.
+
+   2026-10-20 (ТЗ «Новые цены» v8) — баланса больше нет. Образ собирается только по праву, которое
+   занимается атомарно в базе (claim_look, db/2026-10-20-new-prices.sql):
+     { orderId }   — оплаченный картой и ещё не использованный заказ на один образ;
+     {}            — один образ из запаса (купленного пакетом);
+     { rebuildOf } — бесплатная пересборка заказа: одна, в течение 30 минут, без оплаты (use_rebuild).
+   Картинка не нарисовалась — сайт пробует ещё раз; не вышло и со второго — оплаченный образ
+   возвращается в запас (return_look_to_stock), у пересборки возвращается право на неё.
    ============================================================================ */
 
 const { requireUser } = require('../../lib/auth');
-const { previewObrazPoFotoEntitlement, chargeForObrazPoFoto } = require('../../lib/lookAccess');
+const { claimLook, returnLookToStock, useRebuild, setOrderLook } = require('../../lib/orders');
 const { generateLookImage, buildLookImagePrompt, extractClothingSize, stripQuotedText } = require('../../lib/yandexart');
 const { generateLookImageFlux2 } = require('../../lib/flux');
 const { getAccessToken, uploadFile, chatWithImage } = require('../../lib/gigachat');
@@ -81,7 +89,8 @@ function shortenItemForImage(value) {
    Здесь обувь — короткая строка шаблона ("Белые кроссовки или лоферы"), её возвращаем в картинку
    ТОЛЬКО для этого продукта; в api/compose-look.js решение 2026-09-15 не меняется. */
 /* «Сезон» — служебная пометка «Прогулки» по сезонам (js/wizard.js, 2026-10-19): для кабинета, не для картинки. */
-const IMAGE_SKIP_KEYS = ['Макияж', 'Уход', 'Аксессуары', 'Сезон'];
+/* «Сезон» и «Пометка» — служебные пометки для кабинета (js/wizard.js, этот файл), не для картинки. */
+const IMAGE_SKIP_KEYS = ['Макияж', 'Уход', 'Аксессуары', 'Сезон', 'Пометка'];
 
 /* Та же проверка кадра, что работала в api/compose-look.js для YandexART (2026-09-16), но один пункт
    и одна перерисовка — продукт дешёвый. */
@@ -321,6 +330,10 @@ async function tryGenerateImage(layers, fit, gender, hair, itemPhoto, itemHasPer
   }
 }
 
+function isUuid(str) {
+  return typeof str === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+}
+
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Только POST' });
@@ -345,49 +358,70 @@ module.exports = async function handler(req, res) {
   var hair = typeof body.hair === 'string' ? body.hair : '';
   var itemPhoto = parseItemPhoto(body.itemPhoto);
   var itemHasPerson = typeof body.itemHasPerson === 'boolean' ? body.itemHasPerson : null;
+  var rebuildOf = isUuid(body.rebuildOf) ? body.rebuildOf : null;
+  var paidOrderId = isUuid(body.orderId) ? body.orderId : null;
 
+  /* Право на образ занимаем ДО дорогой картинки: без оплаты, запаса или права на пересборку
+     картинка не рисуется вовсе. */
+  var orderId;
   try {
-    var entitled = await previewObrazPoFotoEntitlement(user.id);
-    if (!entitled) {
-      res.status(402).json({ error: 'Недостаточно средств на балансе. Пополните баланс в личном кабинете, чтобы собрать образ.' });
-      return;
+    if (rebuildOf) {
+      var allowed = await useRebuild(user.id, rebuildOf, false);
+      if (!allowed) {
+        res.status(403).json({ error: 'Бесплатная пересборка уже использована или время на неё вышло.' });
+        return;
+      }
+      orderId = rebuildOf;
+    } else {
+      orderId = await claimLook(user.id, paidOrderId);
     }
   } catch (err) {
-    console.error('looks/charge entitlement check error:', err);
-    res.status(500).json({ error: 'Не получилось проверить доступ. Попробуйте ещё раз.' });
+    if (err.code === 'not_paid' || err.code === 'no_stock') {
+      res.status(402).json({ error: 'Нужна оплата образа.', needPayment: true });
+      return;
+    }
+    console.error('looks/charge claim error:', err);
+    res.status(500).json({ error: 'Не получилось проверить оплату. Попробуйте ещё раз.' });
     return;
   }
 
-  /* Картинку рисуем ДО списания (проверка баланса выше — чтобы не платить за картинку тому, кому
-     нечем платить), списываем после — тот же порядок, что в api/compose-look.js. */
   var imageBase64 = await tryGenerateImage(layers, fit, gender, hair, itemPhoto, itemHasPerson);
-
-  try {
-    var result = await chargeForObrazPoFoto(user.id);
-
-    var savedLookId = null;
-    try {
-      var lookToSave = { layers: layers, why: why, fit: fit };
-      if (imageBase64) lookToSave.imageBuffer = Buffer.from(imageBase64, 'base64');
-      var saved = await saveLook(user.id, lookToSave);
-      savedLookId = saved.id;
-    } catch (saveErr) {
-      console.error('looks/charge: не удалось сохранить образ в кабинет:', saveErr);
-    }
-
-    res.status(200).json({
-      method: result.method,
-      orderId: result.orderId,
-      balanceKopecks: result.balanceKopecks,
-      image: imageBase64 ? 'data:image/jpeg;base64,' + imageBase64 : null,
-      savedLookId: savedLookId
-    });
-  } catch (err) {
-    if (err.code === 'insufficient_funds') {
-      res.status(402).json({ error: 'Недостаточно средств на балансе. Пополните баланс в личном кабинете, чтобы собрать образ.' });
-      return;
-    }
-    console.error('looks/charge error:', err);
-    res.status(500).json({ error: 'Не получилось оформить образ. Попробуйте ещё раз.' });
+  if (!imageBase64) {
+    console.warn('looks/charge: картинка не собралась — вторая попытка');
+    imageBase64 = await tryGenerateImage(layers, fit, gender, hair, itemPhoto, itemHasPerson);
   }
+  if (!imageBase64) {
+    try {
+      if (rebuildOf) await useRebuild(user.id, rebuildOf, true);
+      else await returnLookToStock(user.id, orderId);
+    } catch (undoErr) {
+      console.error('looks/charge: не удалось вернуть право на образ:', undoErr);
+    }
+    res.status(503).json({
+      error: rebuildOf
+        ? 'Образ не собрался — пересборка осталась за вами, нажмите «Собрать заново» ещё раз.'
+        : 'Образ не собрался — он сохранён у вас, нажмите «Получить образ» ещё раз.',
+      returnedToStock: !rebuildOf
+    });
+    return;
+  }
+
+  if (rebuildOf) layers['Пометка'] = 'Пересборка';
+
+  var savedLookId = null;
+  try {
+    var saved = await saveLook(user.id, { layers: layers, why: why, fit: fit, imageBuffer: Buffer.from(imageBase64, 'base64') });
+    savedLookId = saved.id;
+    /* У пересборки свой заказ не заводится — право на пересборку остаётся привязанным к первому образу. */
+    if (!rebuildOf) await setOrderLook(user.id, orderId, savedLookId);
+  } catch (saveErr) {
+    console.error('looks/charge: не удалось сохранить образ в кабинет:', saveErr);
+  }
+
+  res.status(200).json({
+    orderId: orderId,
+    image: 'data:image/jpeg;base64,' + imageBase64,
+    savedLookId: savedLookId,
+    rebuildAvailable: !rebuildOf && !!savedLookId
+  });
 };

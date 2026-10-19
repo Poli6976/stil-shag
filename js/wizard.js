@@ -1,4 +1,4 @@
-/* ============ «Образ по фото» (obraz-po-foto.html): анкета + фото вещи, 299 ₽ ============
+/* ============ «Образ по фото» (obraz-po-foto.html): анкета + фото в вещи, 590 ₽ (или из пакета) ============
    Слои повода (Низ/Обувь/Аксессуары/...) — статичные шаблоны по поводу и возрасту из
    ответов, без вызова языковой модели (это и держит цену низкой). Слой «Верх» —
    исключение: реальное описание вещи с фото пользователя, полученное через GigaChat на
@@ -513,6 +513,15 @@
   /* Профиль стиля (ТЗ v5, разделы 7 и 10; js/style-profile.js + api/looks/saved.js).
      null — сервер профиля недоступен (например, SQL ещё не применён): анкета работает как раньше. */
   var profile = null;
+
+  /* Покупки клиентки (ТЗ «Новые цены» v8): образы в запасе, код партнёра, цены — из api/wallet/summary.
+     null — ещё не загружены или сервер недоступен (тогда кнопка без цены, сервер всё равно решит сам). */
+  var purchase = null;
+  /* Бесплатная пересборка: { orderId, original } — пока клиентка на экране результата (только в памяти). */
+  var rebuild = null;
+  /* Перед уходом на оплату анкета и фото сохраняются в браузере, после возврата — продолжаем. */
+  var PENDING_KEY = 'stil.pendingLook';
+  var PENDING_MAX_AGE_MS = 3 * 60 * 60 * 1000;
   var prefilled = {};
   var SP = window.stilStyleProfile || null;
   var PROFILE_ANSWER_KEYS = ['hair', 'metal', 'sun', 'style'];
@@ -576,7 +585,7 @@
       render();
     } else {
       stepIndex = steps.length;
-      chargeAndRenderResult();
+      submitLook();
     }
   }
 
@@ -1204,12 +1213,6 @@
     return { tpl: tpl, layers: layers, isMale: isMale };
   }
 
-  /* Списывает фиксированную цену «Образа по фото» (299 ₽, без пунш-карты и
-     без кодов партнёра — см. chargeForObrazPoFoto в lib/lookAccess.js) и
-     только при успехе показывает результат. Слои считаются заранее из
-     статичных шаблонов (бесплатно для нас) и уходят на сервер вместе со
-     списанием — там по ним рисуется модель типажа клиентки (цвет волос из
-     анкеты) и всё сохраняется в «Мои образы» (api/looks/charge.js). */
   /* На сервер (картинка и «Мои образы») не отправляем строку «Не обязательна» — иначе она попадёт
      в описание картинки. Сезон — служебным полем «Сезон» (charge.js не берёт его в картинку). */
   function layersForServer(built) {
@@ -1222,7 +1225,161 @@
     return out;
   }
 
-  function chargeAndRenderResult() {
+  /* ---------- оплата и покупки (ТЗ «Новые цены» v8) ---------- */
+  function formatRub(kopecks) {
+    return (kopecks / 100).toLocaleString('ru-RU', { maximumFractionDigits: 0 }) + ' ₽';
+  }
+
+  function loadPurchase() {
+    if (!currentSession) return Promise.resolve(null);
+    return fetch('api/wallet/summary', { headers: { 'Authorization': 'Bearer ' + currentSession.access_token } })
+      .then(function (res) { return res.ok ? res.json() : null; })
+      .then(function (data) {
+        purchase = data ? { stock: data.looksInStock || 0, discount: !!data.hasAvailableDiscount, prices: data.prices || {} } : null;
+        return purchase;
+      })
+      .catch(function () { purchase = null; return null; });
+  }
+
+  /* Текст главной кнопки последнего шага — без дополнительных пояснений рядом (ТЗ, раздел 4). */
+  function submitLabel() {
+    if (rebuild) return 'Собрать заново';
+    if (!purchase) return 'Получить образ';
+    if (purchase.stock > 0) return 'Получить образ — из пакета (осталось ' + purchase.stock + ')';
+    if (purchase.discount && purchase.prices.partner) return 'Получить образ — ' + formatRub(purchase.prices.partner) + ' по коду партнёра';
+    if (purchase.prices.look) return 'Получить образ — ' + formatRub(purchase.prices.look);
+    return 'Получить образ';
+  }
+
+  function readPending() {
+    try {
+      var p = JSON.parse(localStorage.getItem(PENDING_KEY) || 'null');
+      if (!p || !p.answers || Date.now() - (p.at || 0) > PENDING_MAX_AGE_MS) return null;
+      return p;
+    } catch (e) { return null; }
+  }
+  function writePending(p) {
+    try { localStorage.setItem(PENDING_KEY, JSON.stringify(p)); return true; } catch (e) { return false; }
+  }
+  function clearPending() {
+    try { localStorage.removeItem(PENDING_KEY); } catch (e) {}
+  }
+
+  function answersWithoutPhoto() {
+    var out = {};
+    Object.keys(answers).forEach(function (k) { if (k !== 'itemPhoto') out[k] = answers[k]; });
+    return out;
+  }
+
+  function submitLook() {
+    if (rebuild) { chargeAndRenderResult({ rebuildOf: rebuild.orderId }); return; }
+    if (purchase && purchase.stock > 0) { chargeAndRenderResult({}); return; }
+    startPayment();
+  }
+
+  /* Один образ без запаса — оплата картой. Ответы и фото сохраняем в браузере: Robokassa вернёт
+     клиентку в личный кабинет (SuccessURL/FailURL), оттуда js/cabinet.js отправит сюда. */
+  function startPayment() {
+    root.innerHTML = '';
+    root.appendChild(el('p', 'wizard-step__hint', 'Переходим к оплате…'));
+    var pending = { answers: answers, at: Date.now() };
+    if (!writePending(pending)) {
+      showStepError('Не получилось сохранить анкету перед оплатой — освободите место в браузере или попробуйте другой браузер.');
+      return;
+    }
+    fetch('api/payments/create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + currentSession.access_token },
+      body: JSON.stringify({ product: 'LOOK', answers: answersWithoutPhoto() })
+    })
+      .then(function (res) { return res.json().catch(function () { return {}; }).then(function (data) { return { res: res, data: data }; }); })
+      .then(function (r) {
+        if (r.res.status === 409 && r.data.useStock) {
+          clearPending();
+          return loadPurchase().then(function () { chargeAndRenderResult({}); });
+        }
+        if (!r.res.ok || !r.data.confirmationUrl) throw new Error(r.data.error || 'Не получилось перейти к оплате.');
+        pending.orderId = r.data.orderId;
+        writePending(pending);
+        window.location.href = r.data.confirmationUrl;
+      })
+      .catch(function (err) {
+        clearPending();
+        showStepError(err.message || 'Не получилось перейти к оплате. Попробуйте ещё раз.');
+      });
+  }
+
+  /* Вернуть клиентку на последний шаг анкеты с сообщением над ним. */
+  function showStepError(message) {
+    stepIndex = visibleSteps().length - 1;
+    render();
+    var note = el('p', 'wizard-result__note wizard-season__warn');
+    note.textContent = message;
+    root.insertBefore(note, root.firstChild);
+  }
+
+  /* Возврат с оплаты: ждём, пока api/payments/webhook.js отметит заказ оплаченным (обычно секунды). */
+  function resumePending(pending) {
+    answers = pending.answers;
+    stepIndex = visibleSteps().length - 1;
+    root.innerHTML = '';
+    root.appendChild(el('p', 'wizard-step__hint', 'Проверяем оплату…'));
+    var tries = 0;
+    function check() {
+      tries++;
+      fetch('api/wallet/summary?order=' + encodeURIComponent(pending.orderId), {
+        headers: { 'Authorization': 'Bearer ' + currentSession.access_token }
+      })
+        .then(function (res) { return res.ok ? res.json() : null; })
+        .then(function (data) {
+          var status = data && data.order && data.order.status;
+          if (status === 'paid') { chargeAndRenderResult({ orderId: pending.orderId }); return; }
+          if (status === 'done' || status === 'returned') {
+            clearPending();
+            loadPurchase().then(function () {
+              showStepError(status === 'done'
+                ? 'Этот образ уже собран — он в «Моих образах» в личном кабинете.'
+                : 'Оплаченный образ сохранён у вас — нажмите «Получить образ» ещё раз.');
+            });
+            return;
+          }
+          if (status === 'created' && tries < 12) { setTimeout(check, 2500); return; }
+          clearPending();
+          showStepError(status === 'created' || !status
+            ? 'Оплата не прошла — ничего не списано. Ответы сохранены, можно попробовать ещё раз.'
+            : 'Заказ не найден. Ответы сохранены, можно попробовать ещё раз.');
+        })
+        .catch(function () {
+          if (tries < 12) { setTimeout(check, 2500); return; }
+          showStepError('Не получилось проверить оплату. Обновите страницу через минуту.');
+        });
+    }
+    check();
+  }
+
+  /* Пересборка возможна, только если поменялся повод, сезон, стиль или «брюки / юбку» (ТЗ, раздел 3, п. 6). */
+  function rebuildSnapshot() {
+    return JSON.stringify([answers.occasion || '', answers.season || '', answers.style || '', answers.bottomPref || '']);
+  }
+  function rebuildChanged() {
+    return !!rebuild && rebuildSnapshot() !== rebuild.original;
+  }
+  function rebuildStartIndex() {
+    var steps = visibleSteps();
+    for (var i = 0; i < steps.length; i++) if (steps[i].id === 'occasion') return i;
+    return 0;
+  }
+  function startRebuild(orderId) {
+    rebuild = { orderId: orderId, original: rebuildSnapshot() };
+    stepIndex = rebuildStartIndex();
+    render();
+    window.scrollTo(0, Math.max(0, root.getBoundingClientRect().top + window.pageYOffset - 120));
+  }
+
+  /* opts: { orderId } — оплаченный заказ; {} — образ из запаса; { rebuildOf } — бесплатная пересборка. */
+  function chargeAndRenderResult(opts) {
+    opts = opts || {};
+    var isRebuild = !!opts.rebuildOf;
     root.innerHTML = '';
     root.appendChild(el('p', 'wizard-step__hint', 'Собираем и рисуем ваш образ — это займёт до минуты…'));
 
@@ -1241,13 +1398,15 @@
         gender: built.isMale ? 'male' : 'female',
         hair: answers.hair || '',
         itemPhoto: answers.itemPhoto || null,
-        itemHasPerson: typeof answers.itemHasPerson === 'boolean' ? answers.itemHasPerson : null
+        itemHasPerson: typeof answers.itemHasPerson === 'boolean' ? answers.itemHasPerson : null,
+        orderId: opts.orderId || null,
+        rebuildOf: opts.rebuildOf || null
       })
     })
       .then(function (res) {
         if (!res.ok) {
           return res.json().catch(function () { return {}; }).then(function (data) {
-            var err = new Error(data.error || 'Не получилось оформить образ.');
+            var err = new Error(data.error || 'Не получилось собрать образ.');
             err.status = res.status;
             throw err;
           });
@@ -1255,18 +1414,32 @@
         return res.json();
       })
       .then(function (data) {
-        renderResult(built, data && data.image, data && data.savedLookId);
+        clearPending();
+        rebuild = null;
+        renderResult(built, data && data.image, data && data.savedLookId, {
+          orderId: data && data.orderId,
+          rebuildAvailable: !!(data && data.rebuildAvailable),
+          isRebuild: isRebuild
+        });
         rememberAfterResult();
+        loadPurchase();
       })
       .catch(function (err) {
-        root.innerHTML = '';
-        root.appendChild(el('span', 'wizard-result__badge', err.status === 402 ? 'Нужна оплата' : 'Ошибка'));
-        root.appendChild(el('h2', null, err.status === 402 ? 'Недостаточно средств на балансе' : 'Не получилось'));
-        root.appendChild(el('p', 'wizard-result__note', (err && err.message) || 'Попробуйте ещё раз.'));
-        var link = el('a', 'btn-3d btn-3d--rect', 'Пополнить баланс в кабинете');
-        link.href = 'cabinet.html';
-        root.appendChild(link);
-        renderRestartLinks();
+        /* Оплаченный заказ занят (или вернулся в запас) — повторно по той же отметке не собрать. */
+        if (opts.orderId) clearPending();
+        loadPurchase().then(function () {
+          if (err.status === 503 || err.status === 402 || err.status === 403) {
+            /* 503 — сбой сборки: образ вернулся в запас (у пересборки — право осталось), та же кнопка ещё раз. */
+            if (err.status === 403) rebuild = null;
+            showStepError(err.message);
+            return;
+          }
+          root.innerHTML = '';
+          root.appendChild(el('span', 'wizard-result__badge', 'Ошибка'));
+          root.appendChild(el('h2', null, 'Не получилось'));
+          root.appendChild(el('p', 'wizard-result__note', (err && err.message) || 'Попробуйте ещё раз.'));
+          renderRestartLinks();
+        });
       });
   }
 
@@ -1287,6 +1460,7 @@
   function restart() {
     answers = {};
     stepIndex = 0;
+    rebuild = null;
     applyProfileAnswers();
     render();
   }
@@ -1713,13 +1887,27 @@
       canAdvance = !(step.sensitive && fitHasValue) || (fitConsentCheckbox && fitConsentCheckbox.checked);
     }
 
+    /* Пересборка: вещь и фото не меняются — назад дальше шага «Повод» не пускаем (ТЗ «Новые цены», раздел 3). */
+    var isLastStep = stepIndex === steps.length - 1;
+    if (rebuild) {
+      var rebuildNote = el('p', 'wizard-result__note');
+      rebuildNote.textContent = 'Бесплатная пересборка: можно поменять повод, сезон или стиль. Для другой вещи — новый образ.';
+      root.insertBefore(rebuildNote, root.firstChild);
+      if (isLastStep && !rebuildChanged()) {
+        canAdvance = false;
+        var sameNote = el('p', 'wizard-result__note wizard-season__warn');
+        sameNote.textContent = 'Поменяйте повод, сезон или стиль — иначе получится тот же образ.';
+        root.appendChild(sameNote);
+      }
+    }
+
     var actions = el('div', 'wizard-actions');
     var backBtn = el('button', 'wizard-back', '← Назад');
     backBtn.type = 'button';
-    backBtn.disabled = stepIndex === 0;
+    backBtn.disabled = stepIndex === 0 || (!!rebuild && stepIndex <= rebuildStartIndex());
     backBtn.addEventListener('click', goBack);
 
-    var nextBtn = el('a', 'btn-3d btn-3d--rect', stepIndex === steps.length - 1 ? 'Получить образ' : 'Далее');
+    var nextBtn = el('a', 'btn-3d btn-3d--rect', isLastStep ? submitLabel() : 'Далее');
     nextBtn.href = '#';
     nextBtn.addEventListener('click', function (e) {
       e.preventDefault();
@@ -1752,7 +1940,9 @@
     } catch (e) {}
   }
 
-  function renderResult(built, image, savedLookId) {
+  /* info: { orderId, rebuildAvailable, isRebuild } — ответ api/looks/charge. */
+  function renderResult(built, image, savedLookId, info) {
+    info = info || {};
     bumpStyleCount();
 
     progressLabel.textContent = 'Готово';
@@ -1762,7 +1952,7 @@
 
     var tpl = built.tpl;
     var layers = built.layers;
-    root.appendChild(el('span', 'wizard-result__badge', 'Собрано по вашим ответам и фото'));
+    root.appendChild(el('span', 'wizard-result__badge', info.isRebuild ? 'Пересборка · собрано по вашим ответам и фото' : 'Собрано по вашим ответам и фото'));
     root.appendChild(el('h2', null, 'Ваш образ по слоям'));
     if (tpl.season) {
       var offNote = offSeasonNote(tpl.season, answers.item);
@@ -1838,11 +2028,28 @@
     productsBlock.appendChild(grid);
     root.appendChild(productsBlock);
 
-    if (SP && profile && savedLookId && currentSession) {
+    /* Оценка не зависит от профиля стиля (отдельная таблица) — показываем при любом сохранённом образе:
+       после «Не моё» с причиной здесь же появляется бесплатная пересборка (ТЗ «Новые цены», раздел 3). */
+    if (SP && savedLookId && currentSession) {
       var rateWrap = el('div', 'wizard-result__block');
       SP.renderRating(rateWrap, currentSession, savedLookId, null);
       rateWrap.appendChild(el('p', 'wizard-result__note',
         'Оценивайте образы — с каждым разом стилист точнее попадает в ваш вкус. Оценки видны в личном кабинете.'));
+      if (info.rebuildAvailable && info.orderId) {
+        var rebuildBox = el('div', 'wizard-rebuild');
+        rebuildBox.hidden = true;
+        var rebuildBtn = el('button', 'btn-3d btn-3d--rect', 'Пересобрать бесплатно');
+        rebuildBtn.type = 'button';
+        rebuildBtn.addEventListener('click', function () { startRebuild(info.orderId); });
+        rebuildBox.appendChild(rebuildBtn);
+        var rebuildHint = el('p', 'wizard-result__note');
+        rebuildHint.textContent = 'Можно поменять повод, сезон или стиль. Для другой вещи — новый образ.';
+        rebuildBox.appendChild(rebuildHint);
+        rateWrap.appendChild(rebuildBox);
+        rateWrap.__onRated = function (rating) {
+          rebuildBox.hidden = !(rating && rating.rating === 'dislike' && rating.reasons && rating.reasons.length);
+        };
+      }
       root.appendChild(rateWrap);
     }
 
@@ -1942,14 +2149,17 @@
       currentSession = session;
       var progressWrap = document.getElementById('wizardProgressWrap');
       if (progressWrap) progressWrap.style.display = '';
-      if (!SP) { render(); return; }
-      SP.getProfile(session)
-        .then(function (data) { profile = (data && data.profile) || null; })
-        .catch(function () { profile = null; })
-        .then(function () {
-          if (stepIndex === 0) applyProfileAnswers();
-          render();
-        });
+      var profileReady = SP
+        ? SP.getProfile(session).then(function (data) { profile = (data && data.profile) || null; }).catch(function () { profile = null; })
+        : Promise.resolve();
+      Promise.all([profileReady, loadPurchase()]).then(function () {
+        /* Вернулись с оплаты (через личный кабинет или напрямую) — продолжаем с того же места. */
+        var pending = readPending();
+        if (pending && pending.orderId) { resumePending(pending); return; }
+        if (pending) clearPending();
+        if (stepIndex === 0) applyProfileAnswers();
+        render();
+      });
     });
   } else {
     render();

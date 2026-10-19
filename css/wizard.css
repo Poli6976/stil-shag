@@ -560,3 +560,7 @@
 }
 @keyframes wizardSeasonIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .wizard-season { animation: none; } }
+
+/* бесплатная пересборка под оценкой «Не моё» (ТЗ «Новые цены», 2026-10-20) */
+.wizard-rebuild { margin-top: 14px; }
+.wizard-rebuild .wizard-result__note { margin-top: 8px; }

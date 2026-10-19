@@ -46,48 +46,22 @@
     return fetch(path, options);
   }
 
+  /* «Мои покупки» (ТЗ «Новые цены» v8): образы в запасе и список прошедших оплат — баланса больше нет. */
   async function loadWallet(session) {
-    var balanceEl = document.getElementById('walletBalance');
+    var stockEl = document.getElementById('walletStock');
     var historyEl = document.getElementById('walletHistory');
-
     try {
       var res = await authedFetch(session, 'api/wallet/summary');
       var data = await res.json();
       if (!res.ok) return;
-      if (balanceEl) balanceEl.textContent = formatRub(data.balanceKopecks);
+      if (stockEl) stockEl.textContent = 'Образов в запасе: ' + (data.looksInStock || 0);
       if (historyEl) {
         historyEl.innerHTML = '';
-        if (!data.history.length) {
-          historyEl.appendChild(el('li', 'wardrobe-empty', 'Операций пока нет'));
-        }
-        /* Показываем первые 5, остальное — по клику "Показать всю историю",
-           иначе у активной клиентки список растягивается на весь экран. */
-        data.history.forEach(function (tx, index) {
-          var sign = tx.type === 'topup' ? '+ ' : '− ';
-          var label = sign + formatRub(tx.amountKopecks) + ' · ' + new Date(tx.createdAt).toLocaleString('ru-RU');
-          var li = el('li', 'wardrobe-item', label);
-          if (index >= 5) li.style.display = 'none';
-          historyEl.appendChild(li);
+        if (!data.purchases.length) historyEl.appendChild(el('li', 'wardrobe-empty', 'Оплат пока нет'));
+        data.purchases.forEach(function (p) {
+          historyEl.appendChild(el('li', 'wardrobe-item',
+            new Date(p.paidAt).toLocaleDateString('ru-RU') + ' · ' + p.title + ' · ' + formatRub(p.amountKopecks)));
         });
-        if (data.history.length > 5) {
-          var toggleLi = document.createElement('li');
-          toggleLi.className = 'wardrobe-empty';
-          var toggleBtn = document.createElement('button');
-          toggleBtn.type = 'button';
-          toggleBtn.className = 'cabinet-link-btn';
-          toggleBtn.textContent = 'Показать всю историю';
-          toggleBtn.addEventListener('click', function () {
-            var expanded = toggleBtn.getAttribute('data-expanded') === '1';
-            var items = historyEl.querySelectorAll('li.wardrobe-item');
-            items.forEach(function (li, i) {
-              if (i >= 5) li.style.display = expanded ? 'none' : '';
-            });
-            toggleBtn.textContent = expanded ? 'Показать всю историю' : 'Свернуть';
-            toggleBtn.setAttribute('data-expanded', expanded ? '0' : '1');
-          });
-          toggleLi.appendChild(toggleBtn);
-          historyEl.appendChild(toggleLi);
-        }
       }
     } catch (e) {}
   }
@@ -322,37 +296,32 @@
     });
   }
 
+  /* Пакеты «3 образа» / «5 образов» — оплата картой, сумму считает сервер (api/payments/create.js). */
   function initCardPayButton() {
-    var btn = document.getElementById('cardPayBtn');
     var msg = document.getElementById('topupMsg');
-    if (!btn) return;
-
-    btn.addEventListener('click', function () {
-      if (!sb) return;
-      showMsg(msg, '');
-      btn.setAttribute('disabled', '');
-
-      sb.auth.getSession()
-        .then(function (r) {
-          var session = r.data && r.data.session;
-          if (!session) throw new Error('Сессия истекла — войдите заново.');
-          return authedFetch(session, 'api/payments/create', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ provider: 'robokassa' })
-          });
-        })
-        .then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); })
-        .then(function (r) {
-          if (!r.ok || !r.data.confirmationUrl) throw new Error((r.data && r.data.error) || 'Не получилось создать платёж.');
-          window.location.href = r.data.confirmationUrl;
-        })
-        .catch(function (err) {
-          showMsg(msg, err.message, true);
-        })
-        .then(function () {
-          btn.removeAttribute('disabled');
-        });
+    document.querySelectorAll('[data-pack]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        if (!sb) return;
+        showMsg(msg, '');
+        btn.setAttribute('disabled', '');
+        sb.auth.getSession()
+          .then(function (r) {
+            var session = r.data && r.data.session;
+            if (!session) throw new Error('Сессия истекла — войдите заново.');
+            return authedFetch(session, 'api/payments/create', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ product: btn.getAttribute('data-pack') })
+            });
+          })
+          .then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); })
+          .then(function (r) {
+            if (!r.ok || !r.data.confirmationUrl) throw new Error((r.data && r.data.error) || 'Не получилось создать платёж.');
+            window.location.href = r.data.confirmationUrl;
+          })
+          .catch(function (err) { showMsg(msg, err.message, true); })
+          .then(function () { btn.removeAttribute('disabled'); });
+      });
     });
   }
 

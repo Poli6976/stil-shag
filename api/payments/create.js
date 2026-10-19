@@ -1,33 +1,38 @@
 /* ============================================================================
-   POST /api/payments/create — начать оплату одной «Примерки» (полной или со
-   скидкой по коду партнёра) картой через Robokassa.
+   POST /api/payments/create — оплатить картой (Robokassa) один заказ из прайса
+   (ТЗ «Новые цены» v8, 2026-10-20). Баланса на сайте больше нет: либо заказ
+   оплачен и выполнен, либо ничего не произошло.
 
-   Требует залогиненного пользователя (Supabase JWT в Authorization: Bearer).
-   Сумма НИКОГДА не берётся из тела запроса — сервер сам вычисляет её как
-   ровно одну «Примерку» (998₽, или 499₽, если есть непогашенный код
-   партнёра — см. hasAvailableDiscount в lib/wallet.js). Если в будущем
-   понадобится отдельная оплата «Консультации виртуального стилиста» (другая
-   цена) — это отдельный кейс, пока на сайте нет ни одной кнопки, которая её
-   вызывает.
+   Тело: { product: 'LOOK' | 'PACK_3' | 'PACK_5', answers?: {...} }
+     LOOK — один образ: сервер сам выбирает цену — 370 ₽, если у клиентки есть
+       непогашенный код партнёра (OBRAZ_PARTNER), иначе 590 ₽ (OBRAZ_PO_FOTO).
+       Если в запасе есть образы из пакета — платить не нужно (409, useStock),
+       сначала тратится запас. answers — ответы анкеты без фото, для истории
+       заказа (сам образ собирает api/looks/charge.js после оплаты).
+     PACK_3 / PACK_5 — пакет; код партнёра на пакеты не действует.
+   Сумма НИКОГДА не берётся из запроса — только из lib/packages.js.
 
-   Создаёт платёжную ссылку в Robokassa — окончательное зачисление на баланс
-   происходит только в api/payments/webhook.js, после проверки подписи
-   уведомления (см. lib/payments/robokassa.js).
-
-   Раньше был и второй способ — временный ручной канал СБП с зачислением по
-   честному слову владельца сайта (клиент переводил деньги лично ему, тот
-   сверял поступление в банковском приложении и подтверждал вручную через
-   admin-sbp-orders.html). Убран 2026-08-28 после того, как Robokassa
-   заработала полностью — вместо честного слова теперь всегда автоматическая
-   проверка подписи. Историю решения см. lib/payments/robokassa.js и
-   DEPLOY-payments.md.
+   Заказ и ожидающий платёж создаются одной транзакцией (create_order_with_payment);
+   оплата подтверждается только в api/payments/webhook.js после проверки подписи.
    ============================================================================ */
 
 const { requireUser } = require('../../lib/auth');
-const { getSupabaseAdmin } = require('../../lib/supabaseAdmin');
 const { createPaymentLink } = require('../../lib/payments/robokassa');
-const { hasAvailableDiscount } = require('../../lib/wallet');
+const { getStock, hasAvailableDiscount, createOrderWithPayment } = require('../../lib/orders');
 const PACKAGES = require('../../lib/packages');
+
+/* Ответы анкеты — только простые значения, без фото и не больше 4 КБ. */
+function sanitizeAnswers(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  var out = {};
+  Object.keys(raw).slice(0, 30).forEach(function (k) {
+    if (k === 'itemPhoto') return;
+    var v = raw[k];
+    if (typeof v === 'string') out[String(k).slice(0, 40)] = v.slice(0, 500);
+    else if (typeof v === 'boolean' || typeof v === 'number') out[String(k).slice(0, 40)] = v;
+  });
+  return JSON.stringify(out).length <= 4096 ? out : null;
+}
 
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -38,6 +43,10 @@ module.exports = async function handler(req, res) {
     res.status(503).json({ error: 'Вход и оплата пока не настроены на сервере.' });
     return;
   }
+  if (!process.env.ROBOKASSA_MERCHANT_LOGIN || !process.env.ROBOKASSA_PASSWORD1) {
+    res.status(503).json({ error: 'Оплата пока не настроена на сервере.' });
+    return;
+  }
 
   var user = await requireUser(req);
   if (!user) {
@@ -45,33 +54,42 @@ module.exports = async function handler(req, res) {
     return;
   }
 
-  var discounted = await hasAvailableDiscount(user.id);
-  var amountKopecks = discounted ? PACKAGES.PRIMERKA_DISCOUNT.priceKopecks : PACKAGES.PRIMERKA.priceKopecks;
-
-  if (!process.env.ROBOKASSA_MERCHANT_LOGIN || !process.env.ROBOKASSA_PASSWORD1) {
-    res.status(503).json({ error: 'Оплата пока не настроена на сервере.' });
+  var body = req.body || {};
+  if (typeof body === 'string') {
+    try { body = JSON.parse(body); } catch (e) { body = {}; }
+  }
+  var product = body.product;
+  if (product !== 'LOOK' && product !== 'PACK_3' && product !== 'PACK_5') {
+    res.status(400).json({ error: 'Неизвестный товар.' });
     return;
   }
 
   try {
+    var packageCode = product;
+    var answers = null;
+    if (product === 'LOOK') {
+      if ((await getStock(user.id)) > 0) {
+        res.status(409).json({ useStock: true, error: 'У вас есть образы в запасе — этот образ соберём без оплаты.' });
+        return;
+      }
+      packageCode = (await hasAvailableDiscount(user.id)) ? 'OBRAZ_PARTNER' : 'OBRAZ_PO_FOTO';
+      answers = sanitizeAnswers(body.answers);
+    }
+    var pkg = PACKAGES[packageCode];
+
     var payment = await createPaymentLink({
-      amountKopecks: amountKopecks,
-      description: discounted ? PACKAGES.PRIMERKA_DISCOUNT.title : PACKAGES.PRIMERKA.title,
+      amountKopecks: pkg.priceKopecks,
+      description: pkg.title,
       customerEmail: user.email
     });
+    var orderId = await createOrderWithPayment(user.id, packageCode, answers, payment.orderId);
 
-    var supabase = getSupabaseAdmin();
-    var insertResult = await supabase.from('payments').insert({
-      user_id: user.id,
-      provider: 'robokassa',
-      provider_payment_id: payment.orderId,
-      amount_kopecks: amountKopecks,
-      status: 'pending',
-      raw_payload: { orderId: payment.orderId, link: payment.link, discounted: discounted }
+    res.status(200).json({
+      confirmationUrl: payment.link,
+      orderId: orderId,
+      packageCode: packageCode,
+      amountKopecks: pkg.priceKopecks
     });
-    if (insertResult.error) throw insertResult.error;
-
-    res.status(200).json({ confirmationUrl: payment.link, amountKopecks: amountKopecks, discounted: discounted });
   } catch (err) {
     console.error('payments/create error:', err);
     res.status(502).json({ error: 'Не получилось создать платёж. Попробуйте ещё раз.' });
