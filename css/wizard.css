@@ -550,10 +550,13 @@
 .wizard-season .wizard-subq { margin-top: 0; }
 .wizard-season__hint { margin-bottom: 12px; }
 .wizard-season__options { grid-template-columns: repeat(4, 1fr); }
+.wizard-bottom__options { grid-template-columns: repeat(3, 1fr); }
+.wizard-bottom__options .wizard-option { min-height: 44px; }
 .wizard-season__options .wizard-option { min-height: 44px; }
 .wizard-season__warn { color: #8a4b12; font-weight: 500; }
 @media (max-width: 560px) {
   .wizard-season__options { grid-template-columns: 1fr 1fr; }
+  .wizard-bottom__options .wizard-option { padding-left: 8px; padding-right: 8px; white-space: nowrap; text-align: center; }
 }
 @keyframes wizardSeasonIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .wizard-season { animation: none; } }
