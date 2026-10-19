@@ -1,4 +1,4 @@
-/* ============ Личный кабинет: демо на localStorage (гардероб) + реальный статус скидки ============
+/* ============ Личный кабинет: демо на localStorage (гардероб) + статус кода партнёра ============
    Реальной авторизации у гардероба и счётчика образов по-прежнему нет (это
    демо на localStorage под ключами "stil.*", пропадёт при очистке браузера).
    Счётчик "stil.styleCount" растёт в js/wizard.js при каждом завершении визарда.
@@ -7,12 +7,23 @@
    lib/partnerCode.js) требует входа через настоящий аккаунт (js/wallet.js,
    Supabase) и записывает погашение в таблицу discount_credits (см.
    db/schema.sql) с уникальным индексом на код. Поэтому один код даёт ровно
-   одну Примерку со скидкой — повторно погасить его (в том числе в другом
-   браузере) нельзя, а сама скидка списывается атомарно вместе с оплатой в
-   api/orders/create.js. Статус скидки ниже запрашивается у сервера
+   один образ за 370 ₽ вместо 590 ₽ — повторно погасить его (в том числе в другом
+   браузере) нельзя, а сам код гасится при оплате образа (api/payments/webhook.js,
+   ТЗ «Новые цены» v8). Статус кода ниже запрашивается у сервера
    (api/wallet/summary), а не хранится в localStorage. */
 
 (function () {
+  /* Robokassa после оплаты (или отказа) возвращает в личный кабинет (SuccessURL/FailURL настроены
+     статично). Если анкета «Образа по фото» ждёт этой оплаты — сразу продолжаем её там
+     (js/wizard.js, ключ stil.pendingLook, срок — 3 часа). */
+  try {
+    var pendingLook = JSON.parse(localStorage.getItem('stil.pendingLook') || 'null');
+    if (pendingLook && pendingLook.orderId && Date.now() - (pendingLook.at || 0) < 3 * 60 * 60 * 1000) {
+      window.location.replace('obraz-po-foto.html');
+      return;
+    }
+  } catch (e) {}
+
   var WARDROBE_KEY = 'stil.wardrobe';
   var COUNT_KEY = 'stil.styleCount';
 
@@ -54,8 +65,7 @@
     var msg = el('p', 'cabinet-status__msg');
     root.appendChild(msg);
 
-    msg.innerHTML = 'Примерка — 998 ₽, или 499 ₽ по коду партнёра. ' +
-      '<a href="obraz-po-foto.html">Собрать образ →</a>. После оплаты — бесплатные образы в подарок.';
+    msg.innerHTML = 'Образ — 590 ₽, в пакете — от 370 ₽. <a href="obraz-po-foto.html">Собрать образ →</a>';
 
     if (!window.stilAuth) return;
     window.stilAuth.getSession()
@@ -67,13 +77,11 @@
       })
       .then(function (r) {
         if (!r || !r.ok) return;
-        if (r.data.freeCreditsRemaining > 0) {
-          msg.innerHTML = 'У вас в подарок ' + r.data.freeCreditsRemaining +
-            (r.data.freeCreditsRemaining === 1 ? ' бесплатный образ' : ' бесплатных образа') +
-            '. <a href="online-stylist.html">Собрать образ →</a>';
+        if (r.data.looksInStock > 0) {
+          msg.innerHTML = 'Образов в запасе: ' + r.data.looksInStock + '. <a href="obraz-po-foto.html">Собрать образ →</a>';
         } else if (r.data.hasAvailableDiscount) {
-          msg.innerHTML = 'Код принят — следующая примерка обойдётся в 499 ₽ вместо 998 ₽. ' +
-            '<a href="online-stylist.html">Собрать образ →</a>';
+          msg.innerHTML = 'Код принят — следующий образ обойдётся в 370 ₽ вместо 590 ₽. ' +
+            '<a href="obraz-po-foto.html">Собрать образ →</a>';
         }
       })
       .catch(function () {});
@@ -125,7 +133,7 @@
              без необходимости приглядываться к мелкому статусу. */
           form.style.display = 'none';
           if (consentLabel) consentLabel.style.display = 'none';
-          showCodeMsg('✓ Код принят — скидка 50% доступна на следующую примерку.', 'success');
+          showCodeMsg('✓ Код принят — следующий образ обойдётся в 370 ₽ вместо 590 ₽.', 'success');
           renderStatus();
         })
         .catch(function (err) {

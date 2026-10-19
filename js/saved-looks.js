@@ -48,7 +48,7 @@
     var lines = displayLayers(look.layers || {}, TELEGRAM_LAYER_LABELS)
       .map(function (pair) { return pair[0] + ': ' + pair[1]; });
     return 'Новый образ 👇\n' + lines.join('\n') +
-      '\n\nСвою вещь разберём точно так же — 998 ₽, и два следующих образа бесплатно → https://stil-shag.ru/how-it-works.html';
+      '\n\nОбраз по фото — 590 ₽, 3 образа — 1 200 ₽ → https://stil-shag.ru/obraz-po-foto.html';
   }
 
   function copyToClipboard(text) {
@@ -130,8 +130,10 @@
 
   /* «· прогулка, осень» — служебный слой «Сезон» из анкеты (2026-10-19). */
   function seasonSuffix(look) {
-    var s = look && look.layers && look.layers['Сезон'];
-    return s ? ' · ' + s : '';
+    var layers = (look && look.layers) || {};
+    var s = layers['Сезон'];
+    /* «Пересборка» — служебная пометка api/looks/charge.js (бесплатная пересборка, ТЗ «Новые цены»). */
+    return (s ? ' · ' + s : '') + (layers['Пометка'] ? ' · ' + String(layers['Пометка']).toLowerCase() : '');
   }
 
   function layersText(look) {
