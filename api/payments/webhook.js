@@ -36,7 +36,10 @@ module.exports = async function handler(req, res) {
   var invId = body.InvId;
   var receivedSignature = body.SignatureValue;
 
-  if (!outSum || !invId || !verifySignature(outSum, invId, receivedSignature, process.env.ROBOKASSA_PASSWORD2)) {
+  /* Тестовый платёж подписан тестовым «Паролем #2» — принимаем его ТОЛЬКО при включённом тестовом режиме. */
+  var testSigned = process.env.ROBOKASSA_DEMO_MODE === '1' && process.env.ROBOKASSA_TEST_PASSWORD2 &&
+    verifySignature(outSum, invId, receivedSignature, process.env.ROBOKASSA_TEST_PASSWORD2);
+  if (!outSum || !invId || !(testSigned || verifySignature(outSum, invId, receivedSignature, process.env.ROBOKASSA_PASSWORD2))) {
     console.error('payments/webhook: неверная подпись Robokassa.');
     res.status(400).send('bad sign');
     return;
