@@ -2039,6 +2039,18 @@
       root.appendChild(img);
     }
 
+    /* Бесплатная пересборка (ТЗ «Новые цены», раздел 3) доступна только на этом экране, поэтому о ней говорим сразу,
+       до оценки: иначе клиентка не узнает, что возможность есть, пока не нажмёт «Не моё». */
+    var canRebuild = !!(info.rebuildAvailable && info.orderId && savedLookId && SP && currentSession);
+    if (canRebuild) {
+      var rebuildTip = el('div', 'wizard-rebuild-tip');
+      rebuildTip.appendChild(el('strong', null, 'Образ не совсем ваш? '));
+      rebuildTip.appendChild(document.createTextNode(
+        'Внизу нажмите «Не моё», отметьте причину и «Сохранить» — появится бесплатная пересборка с другим поводом, ' +
+        'сезоном или стилем. Она одна и доступна только пока вы на этой странице.'));
+      root.appendChild(rebuildTip);
+    }
+
     var layersBlock = el('div', 'wizard-result__block');
     layersBlock.appendChild(el('div', 'wizard-result__block-title', '👕 Образ по слоям'));
     var dl = el('dl', 'wizard-layers');
@@ -2090,7 +2102,13 @@
       SP.renderRating(rateWrap, currentSession, savedLookId, null);
       rateWrap.appendChild(el('p', 'wizard-result__note',
         'Оценивайте образы — с каждым разом стилист точнее попадает в ваш вкус. Оценки видны в личном кабинете.'));
-      if (info.rebuildAvailable && info.orderId) {
+      if (canRebuild) {
+        var reasonsDetails = rateWrap.querySelector('.sp-rate__details');
+        var saveButton = rateWrap.querySelector('.sp-rate__save');
+        if (reasonsDetails && saveButton) {
+          reasonsDetails.insertBefore(
+            el('p', 'sp-rate__hint wizard-rebuild-caption', 'После сохранения появится бесплатная пересборка.'), saveButton);
+        }
         var rebuildBox = el('div', 'wizard-rebuild');
         rebuildBox.hidden = true;
         var rebuildBtn = el('button', 'btn-3d btn-3d--rect', 'Пересобрать бесплатно');
@@ -2098,17 +2116,19 @@
         rebuildBtn.addEventListener('click', function () { startRebuild(info.orderId); });
         rebuildBox.appendChild(rebuildBtn);
         var rebuildHint = el('p', 'wizard-result__note');
-        rebuildHint.textContent = 'Можно поменять повод, сезон или стиль. Для другой вещи — новый образ.';
+        rebuildHint.textContent = 'Можно поменять повод, сезон или стиль. Для другой вещи — новый образ. ' +
+          'Пересборка одна и только на этой странице: если уйти, она пропадёт.';
         rebuildBox.appendChild(rebuildHint);
         rateWrap.appendChild(rebuildBox);
         rateWrap.__onRated = function (rating) {
           rebuildBox.hidden = !(rating && rating.rating === 'dislike' && rating.reasons && rating.reasons.length);
+          if (!rebuildBox.hidden && rebuildBox.scrollIntoView) rebuildBox.scrollIntoView({ block: 'center', behavior: 'smooth' });
         };
       }
       root.appendChild(rateWrap);
     }
 
-    renderRestartLinks();
+    renderRestartLinks(canRebuild);
   }
 
   /* Тексты и цвета — из констант COLOR_TYPES выше, не из ввода клиента; всё равно через
@@ -2155,15 +2175,20 @@
     root.appendChild(block);
   }
 
-  function renderRestartLinks() {
+  /* rebuildPending — на экране результата ещё есть неиспользованная бесплатная пересборка: уход со страницы её сожжёт. */
+  function renderRestartLinks(rebuildPending) {
+    function leaveOk() {
+      return !rebuildPending || window.confirm('Бесплатная пересборка пропадёт, если уйти. Всё равно уйти?');
+    }
     var restartWrap = el('div', 'wizard-restart');
     var restartBtn = el('button', 'wizard-back', 'Начать заново');
     restartBtn.type = 'button';
-    restartBtn.addEventListener('click', restart);
+    restartBtn.addEventListener('click', function () { if (leaveOk()) restart(); });
     restartWrap.appendChild(restartBtn);
     restartWrap.appendChild(el('span', null, ' · '));
     var cabinetLink = el('a', 'wizard-back', 'Личный кабинет');
     cabinetLink.href = 'cabinet.html';
+    cabinetLink.addEventListener('click', function (e) { if (!leaveOk()) e.preventDefault(); });
     restartWrap.appendChild(cabinetLink);
     root.appendChild(restartWrap);
   }
