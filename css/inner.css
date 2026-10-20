@@ -3,6 +3,8 @@
 body {
   background: var(--bg-gradient);
   background-attachment: fixed;
+  /* Montserrat Light (300) на бежевом фоне выглядит бледно — плотнее начертание без смены размера */
+  font-weight: 400;
 }
 
 .page-header {
