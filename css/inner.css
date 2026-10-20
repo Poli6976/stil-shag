@@ -579,20 +579,19 @@ body:has(.page-cta) {
   font-family: var(--font-display);
   font-style: italic;
   font-weight: 500;
-  font-size: 1.4rem;
-  line-height: 1.45;
+  font-size: 1.1rem;
+  line-height: 1.5;
   color: var(--text-primary);
-  -webkit-font-smoothing: antialiased;
 }
 
 .review-card cite {
   display: block;
-  margin-top: 16px;
+  margin-top: 14px;
   font-style: normal;
   font-family: var(--font-body);
   font-weight: 500;
-  font-size: 1.02rem;
-  color: var(--text-muted);
+  font-size: 0.92rem;
+  color: var(--text-primary);
 }
 
 /* ---------- примеры образов ---------- */

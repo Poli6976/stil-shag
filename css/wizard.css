@@ -70,9 +70,10 @@
 
 .wizard-step__hint {
   font-family: var(--font-body);
+  font-weight: 400;
   font-size: 0.94rem;
   line-height: 1.6;
-  color: var(--text-muted);
+  color: var(--text-primary);
   margin-bottom: 28px;
 }
 
