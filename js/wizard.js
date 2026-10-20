@@ -522,6 +522,8 @@
   /* Перед уходом на оплату анкета и фото сохраняются в браузере, после возврата — продолжаем. */
   var PENDING_KEY = 'stil.pendingLook';
   var PENDING_MAX_AGE_MS = 3 * 60 * 60 * 1000;
+  var UNCONFIRMED_KEY = 'stil.unconfirmedOrder';
+  var UNCONFIRMED_MAX_AGE_MS = 24 * 60 * 60 * 1000;
   var prefilled = {};
   var SP = window.stilStyleProfile || null;
   var PROFILE_ANSWER_KEYS = ['hair', 'metal', 'sun', 'style'];
@@ -1265,6 +1267,23 @@
     try { localStorage.removeItem(PENDING_KEY); } catch (e) {}
   }
 
+  /* Заказ, по которому оплату не дождались (resumePending вышел по времени). Платёж при этом мог пройти —
+     Robokassa подтверждает с задержкой, — поэтому номер заказа помним отдельно от pendingLook: при следующем
+     «Получить образ» сначала смотрим его статус и только потом отправляем на новую оплату. */
+  function readUnconfirmed() {
+    try {
+      var u = JSON.parse(localStorage.getItem(UNCONFIRMED_KEY) || 'null');
+      if (!u || !u.orderId || Date.now() - (u.at || 0) > UNCONFIRMED_MAX_AGE_MS) return null;
+      return u;
+    } catch (e) { return null; }
+  }
+  function writeUnconfirmed(orderId) {
+    try { localStorage.setItem(UNCONFIRMED_KEY, JSON.stringify({ orderId: orderId, at: Date.now() })); } catch (e) {}
+  }
+  function clearUnconfirmed() {
+    try { localStorage.removeItem(UNCONFIRMED_KEY); } catch (e) {}
+  }
+
   function answersWithoutPhoto() {
     var out = {};
     Object.keys(answers).forEach(function (k) { if (k !== 'itemPhoto') out[k] = answers[k]; });
@@ -1274,7 +1293,36 @@
   function submitLook() {
     if (rebuild) { chargeAndRenderResult({ rebuildOf: rebuild.orderId }); return; }
     if (purchase && purchase.stock > 0) { chargeAndRenderResult({}); return; }
+    var unconfirmed = readUnconfirmed();
+    if (unconfirmed) { checkUnconfirmedOrder(unconfirmed); return; }
     startPayment();
+  }
+
+  /* Прошлый заказ мог оказаться оплаченным — тогда собираем образ по нему, не отправляя на оплату второй раз. */
+  function checkUnconfirmedOrder(unconfirmed) {
+    root.innerHTML = '';
+    root.appendChild(el('p', 'wizard-step__hint', 'Проверяем прошлую оплату…'));
+    fetch('api/wallet/summary?order=' + encodeURIComponent(unconfirmed.orderId), {
+      headers: { 'Authorization': 'Bearer ' + currentSession.access_token }
+    })
+      .then(function (res) { return res.ok ? res.json() : null; })
+      .then(function (data) {
+        clearUnconfirmed();
+        var status = data && data.order && data.order.status;
+        if (status === 'paid') { chargeAndRenderResult({ orderId: unconfirmed.orderId }); return; }
+        if (status === 'done' || status === 'returned') {
+          loadPurchase().then(function () {
+            showStepError(status === 'done'
+              ? 'Этот образ уже собран — он в «Моих образах» в личном кабинете.'
+              : 'Оплаченный образ сохранён у вас — нажмите «Получить образ» ещё раз.');
+          });
+          return;
+        }
+        startPayment();
+      })
+      .catch(function () {
+        showStepError('Не получилось проверить прошлую оплату. Нажмите «Получить образ» ещё раз через минуту.');
+      });
   }
 
   /* Один образ без запаса — оплата картой. Ответы и фото сохраняем в браузере: Robokassa вернёт
@@ -1345,7 +1393,13 @@
           }
           if (status === 'created' && tries < 12) { setTimeout(check, 2500); return; }
           clearPending();
-          showStepError(status === 'created' || !status
+          if (status === 'created') {
+            /* Оплату не дождались, но она могла пройти — заказ запоминаем, при следующей попытке проверим его первым. */
+            writeUnconfirmed(pending.orderId);
+            showStepError('Оплата пока не подтвердилась. Если вы оплатили — подождите минуту и нажмите «Получить образ»: платить второй раз не придётся. Если не оплачивали — просто нажмите «Получить образ» ещё раз.');
+            return;
+          }
+          showStepError(!status
             ? 'Оплата не прошла — ничего не списано. Ответы сохранены, можно попробовать ещё раз.'
             : 'Заказ не найден. Ответы сохранены, можно попробовать ещё раз.');
         })
@@ -1415,6 +1469,7 @@
       })
       .then(function (data) {
         clearPending();
+        clearUnconfirmed();
         rebuild = null;
         renderResult(built, data && data.image, data && data.savedLookId, {
           orderId: data && data.orderId,
@@ -1426,7 +1481,7 @@
       })
       .catch(function (err) {
         /* Оплаченный заказ занят (или вернулся в запас) — повторно по той же отметке не собрать. */
-        if (opts.orderId) clearPending();
+        if (opts.orderId) { clearPending(); clearUnconfirmed(); }
         loadPurchase().then(function () {
           if (err.status === 503 || err.status === 402 || err.status === 403) {
             /* 503 — сбой сборки: образ вернулся в запас (у пересборки — право осталось), та же кнопка ещё раз. */
