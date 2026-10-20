@@ -170,7 +170,10 @@ async function handleListLooks(req, res) {
     if (result.error) throw result.error;
 
     var looks = result.data.map(function (row) {
-      var publicUrl = supabase.storage.from(SITE_LOOKS_BUCKET).getPublicUrl(row.image_path).data.publicUrl;
+      /* Образ из папки сайта (assets/…) отдаём как есть; остальные — из публичного бакета site-looks. */
+      var publicUrl = /^assets\//.test(row.image_path)
+        ? '/' + row.image_path
+        : supabase.storage.from(SITE_LOOKS_BUCKET).getPublicUrl(row.image_path).data.publicUrl;
       return { id: row.id, caption: row.caption, imageUrl: publicUrl };
     });
     res.status(200).json({ looks: looks });
