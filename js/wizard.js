@@ -1212,7 +1212,27 @@
     }
     /* Под куртку/жакет клиентки — верх набора (byItem.outer уже подставил нужный). */
     var layers = applyItemToLayers(tpl.layers, answers.item, tpl.layers['Верх']);
+    if (!isMale) adjustForSkirt(layers, tpl.season, isTeen);
     return { tpl: tpl, layers: layers, isMale: isMale };
+  }
+
+  /* 2026-10-20 — живой тест: зимняя «Прогулка», вещь клиентки — блузка, а юбку-миди подобрал набор стиля.
+     Колготки и сапоги walkSeasonTemplate ставил только когда ЮБКА — вещь клиентки (itemKind), поэтому
+     вышли юбка, короткие утеплённые ботинки и голые ноги. Смотрим на итоговый образ: есть юбка или платье
+     (своё или из набора) — осенью и зимой сапоги, зимой ещё плотные колготки. Обувь клиентки не трогаем. */
+  var SKIRT_RE = /юбк|юбочк|плать|сарафан/i;
+  function adjustForSkirt(layers, season, isTeen) {
+    if (season !== 'winter' && season !== 'autumn') return;
+    var bottom = String(layers['Низ'] || '');
+    var hasSkirt = SKIRT_RE.test(bottom) && !/^(Прямые|Утеплённые)?\s*(джинсы|брюки)/i.test(bottom) ||
+      SKIRT_RE.test(String(layers['Верх'] || '')) && /выполняет роль верха и низа/.test(String(layers['Верх'] || ''));
+    if (!hasSkirt) return;
+    var shoes = String(layers['Обувь'] || '');
+    if (!isTeen && shoes.indexOf('Уже есть') !== 0) layers['Обувь'] = SEASON_SHOES[season].skirt;
+    if (season === 'winter') {
+      var acc = String(layers['Аксессуары'] || '');
+      if (!/колготк/i.test(acc)) layers['Аксессуары'] = 'Плотные колготки' + (acc ? ', ' + acc.charAt(0).toLowerCase() + acc.slice(1) : '');
+    }
   }
 
   /* На сервер (картинка и «Мои образы») не отправляем строку «Не обязательна» — иначе она попадёт
