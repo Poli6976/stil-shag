@@ -20,6 +20,7 @@ const { requireUser } = require('../../lib/auth');
 const { createPaymentLink } = require('../../lib/payments/robokassa');
 const { getStock, hasAvailableDiscount, createOrderWithPayment } = require('../../lib/orders');
 const PACKAGES = require('../../lib/packages');
+const { isConfigured: isDbConfigured } = require('../../lib/db');
 
 /* Ответы анкеты — только простые значения, без фото и не больше 4 КБ. */
 function sanitizeAnswers(raw) {
@@ -39,7 +40,7 @@ module.exports = async function handler(req, res) {
     res.status(405).json({ error: 'Только POST' });
     return;
   }
-  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  if (!isDbConfigured()) {
     res.status(503).json({ error: 'Вход и оплата пока не настроены на сервере.' });
     return;
   }

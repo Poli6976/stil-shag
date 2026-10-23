@@ -29,6 +29,7 @@
 const { checkRateLimit } = require('../lib/rateLimit');
 const { requireUser } = require('../lib/auth');
 const { getAccessToken, uploadFile, chatWithImage } = require('../lib/gigachat');
+const { isConfigured: isDbConfigured } = require('../lib/db');
 
 const SYSTEM_PROMPT =
   'Ты — ассистент стилиста. Тебе показывают фото вещи одежды или аксессуара — часто она надета ' +
@@ -66,7 +67,7 @@ module.exports = async function handler(req, res) {
     res.status(405).json({ error: 'Только POST' });
     return;
   }
-  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  if (!isDbConfigured()) {
     res.status(503).json({ error: 'Вход и оплата пока не настроены на сервере.' });
     return;
   }

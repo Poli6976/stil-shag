@@ -13,14 +13,14 @@
 
 const { verifyCode } = require('../lib/partnerCode');
 const { requireUser } = require('../lib/auth');
-const { getSupabaseAdmin } = require('../lib/supabaseAdmin');
+const db = require('../lib/db');
 
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Только POST' });
     return;
   }
-  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  if (!db.isConfigured()) {
     res.status(503).json({ error: 'Вход и оплата пока не настроены на сервере.' });
     return;
   }
@@ -48,18 +48,14 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    var supabase = getSupabaseAdmin();
-    var insertResult = await supabase.from('discount_credits').insert({ user_id: user.id, code: code });
-    if (insertResult.error) {
-      if (insertResult.error.code === '23505') {
-        // code уже есть в таблице — кто-то (возможно, этот же пользователь) уже погасил его раньше.
-        res.status(200).json({ valid: false, error: 'Этот код уже был погашен раньше.' });
-        return;
-      }
-      throw insertResult.error;
-    }
+    await db.query('insert into discount_credits (user_id, code) values ($1, $2)', [user.id, code]);
     res.status(200).json({ valid: true });
   } catch (err) {
+    if (err && err.code === '23505') {
+      // code уже есть в таблице — кто-то (возможно, этот же пользователь) уже погасил его раньше.
+      res.status(200).json({ valid: false, error: 'Этот код уже был погашен раньше.' });
+      return;
+    }
     console.error('redeem-code error:', err);
     res.status(500).json({ error: 'Не получилось сохранить код. Попробуйте ещё раз.' });
   }

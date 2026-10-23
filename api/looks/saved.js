@@ -26,6 +26,7 @@ const { listLooks, deleteLook, deleteLooks } = require('../../lib/savedLooks');
 const MAX_BULK_DELETE = 100;
 const styleProfile = require('../../lib/styleProfile');
 const { checkRateLimit } = require('../../lib/rateLimit');
+const { isConfigured: isDbConfigured } = require('../../lib/db');
 
 async function handlePost(req, res, user) {
   var allowed = await checkRateLimit(req, 'looks-profile', { windowSeconds: 600, maxHits: 120 });
@@ -89,7 +90,7 @@ module.exports = async function handler(req, res) {
     res.status(405).json({ error: 'Только GET, POST или DELETE' });
     return;
   }
-  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  if (!isDbConfigured()) {
     res.status(503).json({ error: 'Вход пока не настроен на сервере.' });
     return;
   }

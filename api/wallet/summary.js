@@ -14,6 +14,7 @@ const { requireUser } = require('../../lib/auth');
 const { getStock, hasAvailableDiscount, listPurchases, getOrderStatus, getPendingInvId, finalizeOrderPayment } = require('../../lib/orders');
 const { fetchPaymentState } = require('../../lib/payments/robokassa');
 const PACKAGES = require('../../lib/packages');
+const { isConfigured: isDbConfigured } = require('../../lib/db');
 
 /* Уведомление Robokassa (ResultURL) может не дойти — 20.10.2026 она получила «timed out», а клиентка
    заплатила и осталась без образа. Пока заказ «created», спрашиваем Robokassa сами; оплаченный
@@ -44,7 +45,7 @@ module.exports = async function handler(req, res) {
     res.status(405).json({ error: 'Только GET' });
     return;
   }
-  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  if (!isDbConfigured()) {
     res.status(503).json({ error: 'Вход и оплата пока не настроены на сервере.' });
     return;
   }

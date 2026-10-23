@@ -38,6 +38,7 @@ const { generateLookImage, buildLookImagePrompt, extractClothingSize, stripQuote
 const { generateLookImageFlux2 } = require('../../lib/flux');
 const { getAccessToken, uploadFile, chatWithImage } = require('../../lib/gigachat');
 const { saveLook } = require('../../lib/savedLooks');
+const { isConfigured: isDbConfigured } = require('../../lib/db');
 
 /* Цвет волос из анкеты (js/wizard.js, шаг "colors") — только из этого списка, свободный текст
    клиента в промпт картинки не попадает. */
@@ -334,7 +335,7 @@ module.exports = async function handler(req, res) {
     res.status(405).json({ error: 'Только POST' });
     return;
   }
-  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  if (!isDbConfigured()) {
     res.status(503).json({ error: 'Вход и оплата пока не настроены на сервере.' });
     return;
   }
