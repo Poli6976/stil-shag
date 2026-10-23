@@ -1,7 +1,7 @@
 {
   "regions": ["fra1"],
   "crons": [
-    { "path": "/api/config", "schedule": "0 3 * * *" }
+    { "path": "/api/files?action=cleanup", "schedule": "0 3 * * *" }
   ],
   "redirects": [
     { "source": "/online-stylist.html", "destination": "/obraz-po-foto.html", "statusCode": 301 },

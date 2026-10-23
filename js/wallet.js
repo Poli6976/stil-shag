@@ -1,9 +1,9 @@
-/* ============ Вход и кошелёк (личный кабинет) — настоящий Supabase Auth ============
-   Отдельный файл от js/cabinet.js: гардероб и коды "Примерки" в cabinet.js
-   остаются демо на localStorage без изменений — это касается только того,
-   что требует настоящего аккаунта: баланс, пополнение депозита, история
-   операций. Подключается на cabinet.html после
-   https://unpkg.com/@supabase/supabase-js@2. */
+/* ============ Вход и покупки (личный кабинет) — вход по коду из письма ============
+   Отдельный файл от js/cabinet.js: гардероб в cabinet.js остаётся демо на
+   localStorage — здесь только то, что требует настоящего аккаунта: вход,
+   покупки, аватарка. Вход — свой (api/auth.js) с 2026-10-23, клиент —
+   js/stil-auth.js (тот же интерфейс, что был у supabase-js); подключается
+   на cabinet.html раньше этого файла. */
 
 (function () {
   var sb = null;
@@ -26,16 +26,8 @@
     root.className = 'cabinet-status__msg' + (isError ? ' cabinet-status__msg--error' : '');
   }
 
-  async function initSupabase() {
-    try {
-      var res = await fetch('api/config');
-      if (!res.ok) return null;
-      var cfg = await res.json();
-      if (!cfg.supabaseUrl || !cfg.supabaseAnonKey || !window.supabase) return null;
-      return window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey);
-    } catch (e) {
-      return null;
-    }
+  async function initAuthClient() {
+    return window.stilAuthClient || null;
   }
 
   async function authedFetch(session, path, options) {
@@ -66,23 +58,15 @@
     } catch (e) {}
   }
 
-  /* ---------- аватарка клиентки ---------- */
-  var AVATAR_BUCKET = 'avatars';
+  /* ---------- аватарка клиентки (api/auth.js, action=profile/set-avatar/remove-avatar) ---------- */
 
-  function avatarPublicUrl(path) {
-    if (!sb || !path) return null;
-    var r = sb.storage.from(AVATAR_BUCKET).getPublicUrl(path);
-    return (r.data && r.data.publicUrl) || null;
-  }
-
-  function renderAvatar(path) {
+  function renderAvatar(url) {
     var img = document.getElementById('avatarImg');
     var placeholder = document.getElementById('avatarPlaceholder');
     var removeBtn = document.getElementById('avatarRemoveBtn');
     if (!img || !placeholder) return;
-    var url = avatarPublicUrl(path);
     if (url) {
-      img.src = url + '?t=' + Date.now(); // без этого браузер после замены фото первое время показывал бы старую картинку из кэша по тому же пути
+      img.src = url; // в адресе — время последней замены, браузер не покажет старое фото из кэша
       img.style.display = '';
       placeholder.style.display = 'none';
       if (removeBtn) removeBtn.style.display = '';
@@ -95,10 +79,32 @@
   }
 
   function loadAvatar(session) {
-    if (!sb) return;
-    sb.from('wallets').select('avatar_path').eq('user_id', session.user.id).single()
-      .then(function (r) { renderAvatar(r.data && r.data.avatar_path); })
+    authedFetch(session, 'api/auth?action=profile')
+      .then(function (res) { return res.ok ? res.json() : null; })
+      .then(function (data) { renderAvatar(data && data.avatarUrl); })
       .catch(function () {});
+  }
+
+  function avatarRequest(session, payload) {
+    return authedFetch(session, 'api/auth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }).then(function (res) {
+      return res.json().catch(function () { return {}; }).then(function (data) {
+        if (!res.ok) throw new Error(data.error || 'Не получилось сохранить фото.');
+        return data;
+      });
+    });
+  }
+
+  function blobToDataUrl(blob) {
+    return new Promise(function (resolve, reject) {
+      var reader = new FileReader();
+      reader.onload = function () { resolve(reader.result); };
+      reader.onerror = function () { reject(new Error('Не получилось прочитать фото.')); };
+      reader.readAsDataURL(blob);
+    });
   }
 
   /* Ужимает фото до квадрата 320×320 (canvas, cover-обрезка по центру) —
@@ -151,18 +157,11 @@
       sb.auth.getSession().then(function (r) {
         var session = r.data && r.data.session;
         if (!session) throw new Error('Сессия истекла — войдите заново.');
-        return resizeAvatarFile(file).then(function (blob) {
-          var path = session.user.id + '/avatar.jpg';
-          return sb.storage.from(AVATAR_BUCKET).upload(path, blob, { upsert: true, contentType: 'image/jpeg' })
-            .then(function (uploadResult) {
-              if (uploadResult.error) throw uploadResult.error;
-              return sb.rpc('set_avatar_path', { p_avatar_path: path });
-            })
-            .then(function (rpcResult) {
-              if (rpcResult.error) throw rpcResult.error;
-              renderAvatar(path);
-              showMsg(msg, '');
-            });
+        return resizeAvatarFile(file).then(blobToDataUrl).then(function (dataUrl) {
+          return avatarRequest(session, { action: 'set-avatar', image: dataUrl });
+        }).then(function (data) {
+          renderAvatar(data.avatarUrl);
+          showMsg(msg, '');
         });
       }).catch(function (err) {
         showMsg(msg, err.message || 'Не получилось загрузить фото.', true);
@@ -176,10 +175,7 @@
         sb.auth.getSession().then(function (r) {
           var session = r.data && r.data.session;
           if (!session) throw new Error('Сессия истекла — войдите заново.');
-          var path = session.user.id + '/avatar.jpg';
-          return sb.storage.from(AVATAR_BUCKET).remove([path]).then(function () {
-            return sb.rpc('set_avatar_path', { p_avatar_path: null });
-          });
+          return avatarRequest(session, { action: 'remove-avatar' });
         }).then(function () {
           renderAvatar(null);
         }).catch(function (err) {
@@ -326,7 +322,7 @@
   }
 
   async function init() {
-    sb = await initSupabase();
+    sb = await initAuthClient();
     initLoginForm();
     initLogout();
     initCardPayButton();
@@ -341,9 +337,9 @@
     }
 
     /* Раньше здесь ещё был отдельный ручной sb.auth.getSession() +
-       setLoggedInUI() перед подпиской — но onAuthStateChange в supabase-js v2
-       и так сразу стреляет текущей сессией при подписке (событие
-       INITIAL_SESSION), поэтому ручной вызов дублировал его. Из-за этого
+       setLoggedInUI() перед подпиской — но onAuthStateChange (и в supabase-js v2,
+       и в js/stil-auth.js) и так сразу стреляет текущей сессией при подписке
+       (событие INITIAL_SESSION), поэтому ручной вызов дублировал его. Из-за этого
        setLoggedInUI (а с ней stilSavedLooks.load) срабатывала дважды подряд
        на каждой загрузке кабинета — два параллельных запроса «Моих образов»
        гонялись друг с другом и оба дорисовывали карточки в одну и ту же
@@ -356,8 +352,8 @@
   var sbReadyPromise = init();
 
   /* Маленький мост для js/cabinet.js: он погашает коды партнёра через
-     api/redeem-code и api/discount/status, для чего ему нужен access_token
-     залогиненного пользователя — а клиент Supabase (sb) живёт только здесь. */
+     api/redeem-code и api/wallet/summary, для чего ему нужен access_token
+     залогиненного пользователя — а клиент входа (sb) живёт только здесь. */
   window.stilAuth = {
     getSession: function () {
       return sbReadyPromise.then(function () {

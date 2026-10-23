@@ -1,23 +1,17 @@
-/* ============ Общий вход по email (magic link) для страниц вне cabinet.html ============
-   Та же схема Supabase Auth, что в js/wallet.js (там своя разметка кошелька,
+/* ============ Общий вход по коду из письма для страниц вне cabinet.html ============
+   Та же схема входа, что в js/wallet.js (там своя разметка кошелька,
    переиспользовать её напрямую нельзя) — здесь минимальная переносимая версия
    для visard'а и "Образа по фото": рисует форму входа в переданный контейнер,
    как только пользователь залогинен (сейчас или позже — после перехода по
    ссылке из письма) заменяет её на короткую строку и вызывает onReady(session).
-   Требует <script src="https://unpkg.com/@supabase/supabase-js@2"> раньше себя. */
+   Требует <script src="js/stil-auth.js"> раньше себя (вход — api/auth.js). */
 
 (function () {
   var sbReadyPromise = null;
 
   function getClient() {
     if (sbReadyPromise) return sbReadyPromise;
-    sbReadyPromise = fetch('api/config')
-      .then(function (res) { return res.json(); })
-      .then(function (cfg) {
-        if (!cfg.supabaseUrl || !cfg.supabaseAnonKey || !window.supabase) return null;
-        return window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey);
-      })
-      .catch(function () { return null; });
+    sbReadyPromise = Promise.resolve(window.stilAuthClient || null);
     return sbReadyPromise;
   }
 

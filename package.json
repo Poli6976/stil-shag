@@ -5,6 +5,10 @@
     "node": ">=18"
   },
   "dependencies": {
+    "nodemailer": "10.0.16",
+    "pg": "8.23.1"
+  },
+  "devDependencies": {
     "@supabase/supabase-js": "2.112.3"
   }
 }

@@ -30,16 +30,17 @@
        — список примеров образов для admin-looks.html (публичный список для
        how-it-works.html отдаёт отдельно api/reviews.js, action=list-looks)
      POST body {action:'add-site-look', adminKey, image, caption}
-       — добавить пример образа: image — data URL (base64 JPEG), заливается
-       в бакет site-looks, caption — подпись под картинкой
+       — добавить пример образа: image — data URL (base64 JPEG), сохраняется
+       в хранилище site-looks (lib/storage.js), caption — подпись под картинкой
      POST body {action:'delete-site-look', adminKey, id}
-       — удалить пример образа насовсем (файл из бакета + запись)
+       — удалить пример образа насовсем (файл из хранилища + запись)
    ============================================================================ */
 
 const crypto = require('crypto');
 const { checkAdminKey } = require('../lib/adminAuth');
 const { generateCode, sanitizeRef } = require('../lib/partnerCode');
-const { getSupabaseAdmin } = require('../lib/supabaseAdmin');
+const db = require('../lib/db');
+const storage = require('../lib/storage');
 
 const SITE_LOOKS_BUCKET = 'site-looks';
 
@@ -73,8 +74,8 @@ module.exports = async function handler(req, res) {
   res.status(400).json({ error: 'Неизвестное действие.' });
 };
 
-function requireSupabaseEnv(res) {
-  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+function requireDbEnv(res) {
+  if (!db.isConfigured()) {
     res.status(503).json({ error: 'Не настроено на сервере.' });
     return false;
   }
@@ -104,12 +105,11 @@ function normalizeContact(str) {
    в добавлении. Ищем совпадение по названию ИЛИ по контакту среди уже
    существующих партнёров (независимо от активен/неактивен — неактивного тоже
    не нужно заводить повторно, проще снова его активировать). */
-async function findDuplicatePartner(supabase, name, contact) {
-  var result = await supabase.from('partners').select('id, name, contact, status');
-  if (result.error) throw result.error;
+async function findDuplicatePartner(name, contact) {
+  var result = await db.query('select id, name, contact, status from partners');
   var normName = normalizePartnerText(name);
   var normContact = contact ? normalizeContact(contact) : null;
-  return (result.data || []).find(function (p) {
+  return result.rows.find(function (p) {
     if (normalizePartnerText(p.name) === normName) return true;
     if (normContact && p.contact && normalizeContact(p.contact) === normContact) return true;
     return false;
@@ -121,13 +121,11 @@ async function handleListPartners(req, res) {
     res.status(401).json({ error: 'Неверный админ-ключ.' });
     return;
   }
-  if (!requireSupabaseEnv(res)) return;
+  if (!requireDbEnv(res)) return;
 
   try {
-    var supabase = getSupabaseAdmin();
-    var result = await supabase.from('partner_stats').select('*').order('created_at', { ascending: false });
-    if (result.error) throw result.error;
-    res.status(200).json({ partners: result.data });
+    var result = await db.query('select * from partner_stats order by created_at desc');
+    res.status(200).json({ partners: result.rows });
   } catch (err) {
     console.error('admin list-partners error:', err);
     res.status(500).json({ error: 'Не получилось загрузить партнёров.' });
@@ -139,7 +137,7 @@ async function handleAddPartner(req, res) {
     res.status(401).json({ error: 'Неверный админ-ключ.' });
     return;
   }
-  if (!requireSupabaseEnv(res)) return;
+  if (!requireDbEnv(res)) return;
 
   var name = String((req.body && req.body.name) || '').trim();
   if (!name) {
@@ -151,9 +149,7 @@ async function handleAddPartner(req, res) {
   var baseSlug = sanitizeRef(name).slice(0, 6);
 
   try {
-    var supabase = getSupabaseAdmin();
-
-    var duplicate = await findDuplicatePartner(supabase, name, contact);
+    var duplicate = await findDuplicatePartner(name, contact);
     if (duplicate) {
       res.status(409).json({
         error: 'Такой партнёр уже есть: «' + duplicate.name + '»' +
@@ -168,16 +164,16 @@ async function handleAddPartner(req, res) {
     // уже существующим партнёром (например, два партнёра с похожим названием).
     for (var attempt = 0; attempt < 5; attempt++) {
       var trySlug = attempt === 0 ? baseSlug : baseSlug + crypto.randomBytes(1).toString('hex').toUpperCase();
-      var insertResult = await supabase
-        .from('partners')
-        .insert({ name: name, slug: trySlug, contact: contact, status: 'active', notes: notes })
-        .select()
-        .single();
-      if (!insertResult.error) {
-        res.status(200).json({ partner: insertResult.data });
+      try {
+        var partner = await db.one(
+          "insert into partners (name, slug, contact, status, notes) values ($1, $2, $3, 'active', $4) returning *",
+          [name, trySlug, contact, notes]
+        );
+        res.status(200).json({ partner: partner });
         return;
+      } catch (insertErr) {
+        if (insertErr.code !== '23505') throw insertErr;
       }
-      if (insertResult.error.code !== '23505') throw insertResult.error;
     }
     res.status(500).json({ error: 'Не получилось создать уникальную метку партнёра — попробуйте другое название.' });
   } catch (err) {
@@ -191,7 +187,7 @@ async function handleSetPartnerStatus(req, res) {
     res.status(401).json({ error: 'Неверный админ-ключ.' });
     return;
   }
-  if (!requireSupabaseEnv(res)) return;
+  if (!requireDbEnv(res)) return;
 
   var partnerId = req.body && req.body.partnerId;
   var status = req.body && req.body.status;
@@ -201,9 +197,7 @@ async function handleSetPartnerStatus(req, res) {
   }
 
   try {
-    var supabase = getSupabaseAdmin();
-    var result = await supabase.from('partners').update({ status: status }).eq('id', partnerId);
-    if (result.error) throw result.error;
+    await db.query('update partners set status = $1 where id = $2', [status, partnerId]);
     res.status(200).json({ ok: true });
   } catch (err) {
     console.error('admin set-partner-status error:', err);
@@ -216,7 +210,7 @@ async function handleDeletePartner(req, res) {
     res.status(401).json({ error: 'Неверный админ-ключ.' });
     return;
   }
-  if (!requireSupabaseEnv(res)) return;
+  if (!requireDbEnv(res)) return;
 
   var partnerId = req.body && req.body.partnerId;
   if (!partnerId) {
@@ -225,9 +219,7 @@ async function handleDeletePartner(req, res) {
   }
 
   try {
-    var supabase = getSupabaseAdmin();
-    var result = await supabase.from('partners').delete().eq('id', partnerId);
-    if (result.error) throw result.error;
+    await db.query('delete from partners where id = $1', [partnerId]);
     res.status(200).json({ ok: true });
   } catch (err) {
     console.error('admin delete-partner error:', err);
@@ -244,7 +236,7 @@ async function handleGenerateCode(req, res) {
     res.status(401).json({ error: 'Неверный админ-ключ.' });
     return;
   }
-  if (!requireSupabaseEnv(res)) return;
+  if (!requireDbEnv(res)) return;
 
   var partnerId = req.body && req.body.partnerId;
   if (!partnerId) {
@@ -257,13 +249,12 @@ async function handleGenerateCode(req, res) {
   var note = String((req.body && req.body.note) || '').trim() || null;
 
   try {
-    var supabase = getSupabaseAdmin();
-    var partnerResult = await supabase.from('partners').select('id, slug').eq('id', partnerId).single();
-    if (partnerResult.error || !partnerResult.data) {
+    var partnerRow = await db.one('select id, slug from partners where id = $1', [partnerId]);
+    if (!partnerRow) {
       res.status(404).json({ error: 'Партнёр не найден.' });
       return;
     }
-    var slug = partnerResult.data.slug;
+    var slug = partnerRow.slug;
 
     var codes = [];
     var rows = [];
@@ -275,11 +266,14 @@ async function handleGenerateCode(req, res) {
       var ref = (slug + crypto.randomBytes(3).toString('hex').toUpperCase()).slice(0, 12);
       var code = generateCode(process.env.PARTNER_CODE_SECRET, ref);
       codes.push(code);
-      rows.push({ partner_id: partnerId, code: code, ref: ref, note: note });
+      rows.push({ code: code, ref: ref });
     }
 
-    var insertResult = await supabase.from('partner_codes').insert(rows);
-    if (insertResult.error) throw insertResult.error;
+    await db.query(
+      'insert into partner_codes (partner_id, code, ref, note) ' +
+      'select $1, c, r, $4 from unnest($2::text[], $3::text[]) as t(c, r)',
+      [partnerId, rows.map(function (r) { return r.code; }), rows.map(function (r) { return r.ref; }), note]
+    );
 
     res.status(200).json({ codes: codes });
   } catch (err) {
@@ -293,19 +287,17 @@ async function handleListSiteLooks(req, res) {
     res.status(401).json({ error: 'Неверный админ-ключ.' });
     return;
   }
-  if (!requireSupabaseEnv(res)) return;
+  if (!requireDbEnv(res)) return;
 
   try {
-    var supabase = getSupabaseAdmin();
-    var result = await supabase
-      .from('site_looks')
-      .select('id, image_path, caption, sort_order, created_at')
-      .order('sort_order', { ascending: true })
-      .order('created_at', { ascending: false });
-    if (result.error) throw result.error;
+    var result = await db.query(
+      'select id, image_path, caption, sort_order, created_at from site_looks order by sort_order asc, created_at desc'
+    );
 
-    var looks = result.data.map(function (row) {
-      var publicUrl = supabase.storage.from(SITE_LOOKS_BUCKET).getPublicUrl(row.image_path).data.publicUrl;
+    var looks = result.rows.map(function (row) {
+      var publicUrl = /^assets\//.test(row.image_path)
+        ? '/' + row.image_path
+        : storage.publicUrl(SITE_LOOKS_BUCKET, row.image_path);
       return { id: row.id, caption: row.caption, sortOrder: row.sort_order, createdAt: row.created_at, imageUrl: publicUrl };
     });
     res.status(200).json({ looks: looks });
@@ -320,7 +312,7 @@ async function handleAddSiteLook(req, res) {
     res.status(401).json({ error: 'Неверный админ-ключ.' });
     return;
   }
-  if (!requireSupabaseEnv(res)) return;
+  if (!requireDbEnv(res)) return;
 
   var caption = String((req.body && req.body.caption) || '').trim().slice(0, 300);
   if (!caption) {
@@ -340,23 +332,10 @@ async function handleAddSiteLook(req, res) {
   }
 
   try {
-    var supabase = getSupabaseAdmin();
     var path = crypto.randomUUID() + '.jpg';
-
-    var uploadResult = await supabase.storage.from(SITE_LOOKS_BUCKET).upload(path, buffer, {
-      contentType: 'image/jpeg',
-      upsert: false
-    });
-    if (uploadResult.error) throw uploadResult.error;
-
-    var insertResult = await supabase
-      .from('site_looks')
-      .insert({ image_path: path, caption: caption })
-      .select('id')
-      .single();
-    if (insertResult.error) throw insertResult.error;
-
-    res.status(200).json({ ok: true, id: insertResult.data.id });
+    await storage.upload(SITE_LOOKS_BUCKET, path, buffer, match[1] === 'png' ? 'image/png' : 'image/jpeg');
+    var inserted = await db.one('insert into site_looks (image_path, caption) values ($1, $2) returning id', [path, caption]);
+    res.status(200).json({ ok: true, id: inserted.id });
   } catch (err) {
     console.error('admin add-site-look error:', err);
     res.status(500).json({ error: 'Не получилось добавить образ.' });
@@ -368,7 +347,7 @@ async function handleDeleteSiteLook(req, res) {
     res.status(401).json({ error: 'Неверный админ-ключ.' });
     return;
   }
-  if (!requireSupabaseEnv(res)) return;
+  if (!requireDbEnv(res)) return;
 
   var id = req.body && req.body.id;
   if (!id) {
@@ -377,19 +356,18 @@ async function handleDeleteSiteLook(req, res) {
   }
 
   try {
-    var supabase = getSupabaseAdmin();
-    var selectResult = await supabase.from('site_looks').select('image_path').eq('id', id).maybeSingle();
-    if (selectResult.error) throw selectResult.error;
-    if (!selectResult.data) {
+    var deleted = await db.one('delete from site_looks where id = $1 returning image_path', [id]);
+    if (!deleted) {
       res.status(404).json({ error: 'Образ не найден.' });
       return;
     }
-
-    var removeResult = await supabase.storage.from(SITE_LOOKS_BUCKET).remove([selectResult.data.image_path]);
-    if (removeResult.error) console.error('admin delete-site-look: не удалось удалить файл:', removeResult.error);
-
-    var deleteResult = await supabase.from('site_looks').delete().eq('id', id);
-    if (deleteResult.error) throw deleteResult.error;
+    if (!/^assets\//.test(deleted.image_path)) {
+      try {
+        await storage.remove(SITE_LOOKS_BUCKET, [deleted.image_path]);
+      } catch (removeErr) {
+        console.error('admin delete-site-look: не удалось удалить файл:', removeErr && removeErr.message);
+      }
+    }
 
     res.status(200).json({ ok: true });
   } catch (err) {
