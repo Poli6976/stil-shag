@@ -38,6 +38,10 @@
        — подарить образы (1–5) в запас по email: продавцу-партнёру на пробу.
        Аккаунта может ещё не быть — он заводится сразу, и когда человек
        войдёт по коду с этой почтой, образы уже ждут в кабинете.
+     GET  query {action:'stats', tz} + заголовок X-Admin-Key
+       — статистика для admin-stats.html: клиентки, оплаты, собранные образы
+       за сегодня / 7 / 30 дней / всё время, по дням за 30 дней, по партнёрам,
+       последние оплаты. tz — часовой пояс браузера владельца (для «сегодня»).
    ============================================================================ */
 
 const crypto = require('crypto');
@@ -78,6 +82,9 @@ module.exports = async function handler(req, res) {
   }
   if (req.method === 'POST' && action === 'gift-look') {
     return handleGiftLook(req, res);
+  }
+  if (req.method === 'GET' && action === 'stats') {
+    return handleStats(req, res);
   }
   res.status(400).json({ error: 'Неизвестное действие.' });
 };
@@ -424,5 +431,126 @@ async function handleGiftLook(req, res) {
   } catch (err) {
     console.error('admin gift-look error:', err && err.message);
     res.status(500).json({ error: 'Не получилось подарить образ.' });
+  }
+}
+
+/* Часовой пояс приходит из браузера владельца — нужен только для границы «сегодня» и дней на
+   графике. Неизвестный пояс Postgres не примет, поэтому сначала проверяем его в Intl. */
+function safeTimeZone(tz) {
+  tz = String(tz || '');
+  if (tz.length > 64) return 'Europe/Moscow';
+  try {
+    new Intl.DateTimeFormat('ru-RU', { timeZone: tz });
+    return tz;
+  } catch (e) {
+    return 'Europe/Moscow';
+  }
+}
+
+/* «Сегодня» — с полуночи по часам владельца; неделя и месяц — скользящие 7 и 30 суток. */
+const STATS_PERIODS_SQL =
+  "with periods(key, since) as (values " +
+  "  ('today', date_trunc('day', now() at time zone $1::text) at time zone $1::text), " +
+  "  ('week', now() - interval '7 days'), " +
+  "  ('month', now() - interval '30 days'), " +
+  "  ('all', '-infinity'::timestamptz)" +
+  ") ";
+
+/* Оплата считается по моменту подтверждения (payments.updated_at — его ставит
+   finalize_order_payment). «Собрано образов» — заказы, к которым привязалась картинка
+   (look_id): так не теряются образы, которые клиентка потом удалила из «Моих образов»,
+   и не задваиваются бесплатные пересборки — у них свой счётчик. */
+async function handleStats(req, res) {
+  if (!checkAdminKey(req.headers && req.headers['x-admin-key'])) {
+    res.status(401).json({ error: 'Неверный админ-ключ.' });
+    return;
+  }
+  if (!requireDbEnv(res)) return;
+
+  var tz = safeTimeZone(req.query && req.query.tz);
+
+  try {
+    var results = await Promise.all([
+      db.query(
+        STATS_PERIODS_SQL +
+        'select p.key, ' +
+        '  (select count(*) from users u where u.created_at >= p.since) as new_users, ' +
+        '  (select count(*) from users u where u.last_login_at >= p.since) as active_users, ' +
+        "  (select count(*) from payments x where x.status = 'succeeded' and x.updated_at >= p.since) as paid_count, " +
+        "  (select coalesce(sum(x.amount_kopecks), 0)::bigint from payments x where x.status = 'succeeded' and x.updated_at >= p.since) as paid_kopecks, " +
+        "  (select count(distinct x.user_id) from payments x where x.status = 'succeeded' and x.updated_at >= p.since) as payers, " +
+        "  (select count(*) from payments x where x.status in ('pending', 'failed', 'canceled') and x.created_at >= p.since) as unpaid_count, " +
+        "  (select count(*) from orders o where o.look_id is not null and o.done_at >= p.since) as looks_built, " +
+        '  (select count(*) from orders o where o.rebuild_used and o.done_at >= p.since) as rebuilds, ' +
+        "  (select count(*) from look_ratings r where r.rating = 'like' and r.created_at >= p.since) as likes, " +
+        "  (select count(*) from look_ratings r where r.rating = 'dislike' and r.created_at >= p.since) as dislikes, " +
+        '  (select count(*) from discount_credits d where d.created_at >= p.since) as codes_redeemed, ' +
+        "  (select coalesce(sum((o.answers->>'gift')::int), 0)::bigint from orders o where o.package_code = 'GIFT_LOOK' and o.created_at >= p.since) as gifted_looks " +
+        'from periods p',
+        [tz]
+      ),
+      db.query(
+        STATS_PERIODS_SQL +
+        'select p.key, o.package_code, count(*) as n, coalesce(sum(x.amount_kopecks), 0)::bigint as kopecks ' +
+        "from periods p join payments x on x.status = 'succeeded' and x.updated_at >= p.since " +
+        'join orders o on o.id = x.order_id ' +
+        'group by p.key, o.package_code',
+        [tz]
+      ),
+      db.query(
+        'with days as (' +
+        "  select d::timestamp as day from generate_series(date_trunc('day', now() at time zone $1::text) - interval '29 days', " +
+        "    date_trunc('day', now() at time zone $1::text), interval '1 day') d" +
+        ') ' +
+        "select to_char(days.day, 'YYYY-MM-DD') as day, " +
+        "  (select count(*) from payments x where x.status = 'succeeded' " +
+        "     and x.updated_at >= days.day at time zone $1::text and x.updated_at < (days.day + interval '1 day') at time zone $1::text) as paid_count, " +
+        "  (select coalesce(sum(x.amount_kopecks), 0)::bigint from payments x where x.status = 'succeeded' " +
+        "     and x.updated_at >= days.day at time zone $1::text and x.updated_at < (days.day + interval '1 day') at time zone $1::text) as paid_kopecks, " +
+        '  (select count(*) from users u ' +
+        "     where u.created_at >= days.day at time zone $1::text and u.created_at < (days.day + interval '1 day') at time zone $1::text) as new_users " +
+        'from days order by days.day',
+        [tz]
+      ),
+      db.query(
+        'select name, status, codes_issued, codes_redeemed, orders_completed, revenue_kopecks ' +
+        'from partner_stats order by revenue_kopecks desc, codes_redeemed desc, created_at desc'
+      ),
+      db.query(
+        'select x.updated_at as paid_at, x.amount_kopecks, o.package_code, u.email, pt.name as partner_name ' +
+        'from payments x ' +
+        'join orders o on o.id = x.order_id ' +
+        'join users u on u.id = x.user_id ' +
+        'left join discount_credits dc on dc.order_id = o.id ' +
+        'left join partner_codes pc on pc.code = dc.code ' +
+        'left join partners pt on pt.id = pc.partner_id ' +
+        "where x.status = 'succeeded' " +
+        'order by x.updated_at desc limit 30'
+      ),
+      db.query(
+        'select coalesce(sum(looks_in_stock), 0)::bigint as looks, count(*) filter (where looks_in_stock > 0) as holders from wallets'
+      )
+    ]);
+
+    var periods = {};
+    results[0].rows.forEach(function (row) {
+      periods[row.key] = row;
+      row.byPackage = {};
+    });
+    results[1].rows.forEach(function (row) {
+      if (periods[row.key]) periods[row.key].byPackage[row.package_code] = { n: row.n, kopecks: row.kopecks };
+    });
+
+    res.status(200).json({
+      timeZone: tz,
+      periods: periods,
+      daily: results[2].rows,
+      partners: results[3].rows,
+      recentPayments: results[4].rows,
+      stock: results[5].rows[0]
+    });
+  } catch (err) {
+    console.error('admin stats error:', err && err.message);
+    res.status(500).json({ error: 'Не получилось загрузить статистику.' });
   }
 }

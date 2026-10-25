@@ -1,0 +1,403 @@
+<!doctype html>
+<html lang="ru" data-theme="light">
+<head>
+<meta charset="utf-8">
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Статистика — служебная страница</title>
+<meta name="robots" content="noindex, nofollow">
+
+<link rel="stylesheet" href="css/tokens.css?v=7">
+<link rel="stylesheet" href="css/base.css?v=2">
+<link rel="stylesheet" href="css/components/button-3d.css?v=3">
+<link rel="stylesheet" href="css/cabinet.css?v=2">
+<style>
+  body { padding: 24px 16px; display: flex; justify-content: center; }
+  .admin-wrap { max-width: 980px; width: 100%; }
+  .admin-card { padding: 28px 32px; border-radius: 18px; background: rgba(255,255,255,.55); border: 1px solid var(--glow-silver); margin: 0 0 24px; }
+  .admin-card h1 { font-family: var(--font-display); font-size: 1.5rem; font-weight: 500; margin: 0 0 8px; }
+  .admin-card h2 { font-family: var(--font-display); font-size: 1.15rem; font-weight: 500; margin: 0 0 6px; }
+  .admin-card p { font-family: var(--font-body); color: var(--text-muted); font-size: .92rem; line-height: 1.6; margin: 0 0 18px; }
+  .admin-card p.stats-note { font-size: .82rem; margin: 0 0 16px; }
+  .admin-field { margin-bottom: 14px; }
+  .admin-field label { display: block; font-family: var(--font-body); font-size: .82rem; color: var(--text-muted); margin-bottom: 6px; }
+  .admin-field input { width: 100%; box-sizing: border-box; padding: 12px 16px; border-radius: 12px; border: 1px solid var(--glow-silver); background: rgba(255,255,255,.6); font-family: var(--font-body); font-size: .96rem; color: var(--text-primary); }
+  .admin-msg { margin-top: 14px; font-family: var(--font-body); font-size: .92rem; color: var(--text-muted); }
+  .admin-msg.is-error { color: #b23b3b; }
+  .admin-links { font-family: var(--font-body); font-size: .85rem; margin-top: 14px; }
+  .admin-links a { color: var(--accent-gold-ink); }
+
+  /* Переключатель периода */
+  .stats-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin: 0 0 18px; }
+  .stats-tab { font-family: var(--font-body); font-size: .85rem; padding: 8px 16px; border-radius: 999px; border: 1px solid var(--glow-silver); background: rgba(255,255,255,.6); color: var(--text-primary); cursor: pointer; }
+  .stats-tab[aria-pressed="true"] { background: var(--text-primary); color: #fff; border-color: var(--text-primary); }
+
+  /* Плитки с цифрами */
+  .stats-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; }
+  .stats-tile { padding: 14px 16px; border-radius: 14px; background: rgba(255,255,255,.6); border: 1px solid var(--glow-silver); }
+  .stats-tile__label { font-family: var(--font-body); font-size: .78rem; color: var(--text-muted); line-height: 1.35; }
+  .stats-tile__value { font-family: var(--font-display); font-size: 1.9rem; font-weight: 500; color: var(--text-primary); line-height: 1.15; margin-top: 4px; font-variant-numeric: tabular-nums; }
+  .stats-tile__sub { font-family: var(--font-body); font-size: .76rem; color: var(--text-faint); margin-top: 2px; }
+  .stats-tile--main { border-color: var(--accent-gold-ink); }
+
+  /* Таблицы */
+  .stats-table-wrap { overflow-x: auto; }
+  .stats-table { width: 100%; border-collapse: collapse; font-family: var(--font-body); font-size: .88rem; }
+  .stats-table th, .stats-table td { text-align: left; padding: 10px 10px; border-bottom: 1px solid var(--glow-silver); vertical-align: top; }
+  .stats-table th { color: var(--text-muted); font-weight: 500; font-size: .74rem; text-transform: uppercase; letter-spacing: .04em; }
+  .stats-table td.num, .stats-table th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .stats-table .muted { color: var(--text-faint); font-size: .8rem; }
+  .stats-empty { font-family: var(--font-body); font-style: italic; color: var(--text-faint); }
+
+  /* График по дням: одна серия — сумма оплат за день */
+  .stats-chart { position: relative; }
+  .stats-chart__plot { display: flex; align-items: flex-end; gap: 2px; height: 160px; border-bottom: 1px solid var(--glow-silver); }
+  .stats-bar { flex: 1; height: 100%; display: flex; align-items: flex-end; cursor: default; }
+  .stats-bar__fill { width: 100%; background: #6a58b8; border-radius: 4px 4px 0 0; min-height: 0; }
+  .stats-bar:hover .stats-bar__fill, .stats-bar:focus .stats-bar__fill { background: #4f3f9a; }
+  .stats-bar:focus { outline: none; }
+  .stats-chart__axis { display: flex; justify-content: space-between; font-family: var(--font-body); font-size: .74rem; color: var(--text-faint); margin-top: 6px; }
+  .stats-chart__max { font-family: var(--font-body); font-size: .74rem; color: var(--text-faint); margin-bottom: 4px; }
+  .stats-tip { position: absolute; pointer-events: none; padding: 8px 10px; border-radius: 10px; background: var(--text-primary); color: #fff; font-family: var(--font-body); font-size: .8rem; line-height: 1.4; white-space: nowrap; transform: translate(-50%, -100%); display: none; z-index: 2; }
+
+  @media (max-width: 560px) {
+    .admin-card { padding: 20px 16px; }
+    .stats-tile__value { font-size: 1.5rem; }
+  }
+</style>
+</head>
+<body>
+
+<div class="admin-wrap">
+
+  <div class="admin-card">
+    <h1>Статистика</h1>
+    <p>
+      Служебная страница, не для покупательниц — ниоткуда на сайте на неё нет ссылки. Цифры берутся
+      прямо из базы: оплаты, заказы, собранные образы. Сколько людей просто заходит на сайт, здесь не
+      видно — это покажет Яндекс.Метрика, когда её подключим.
+    </p>
+    <div class="admin-field">
+      <label for="adminKey">Админ-ключ</label>
+      <input type="password" id="adminKey" name="stil-admin-key-not-a-login-field" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore data-bwignore>
+    </div>
+    <button type="button" id="loadBtn" class="btn-3d btn-3d--rect">Показать статистику</button>
+    <div class="admin-msg" id="topMsg" style="display:none"></div>
+    <div class="admin-links"><a href="admin-generate-code.html">Партнёры и коды →</a></div>
+  </div>
+
+  <div id="statsBody" style="display:none">
+
+    <div class="admin-card">
+      <h2>Главное</h2>
+      <div class="stats-tabs" role="group" aria-label="Период">
+        <button type="button" class="stats-tab" data-period="today" aria-pressed="false">Сегодня</button>
+        <button type="button" class="stats-tab" data-period="week" aria-pressed="true">7 дней</button>
+        <button type="button" class="stats-tab" data-period="month" aria-pressed="false">30 дней</button>
+        <button type="button" class="stats-tab" data-period="all" aria-pressed="false">Всё время</button>
+      </div>
+      <div class="stats-tiles" id="tiles"></div>
+    </div>
+
+    <div class="admin-card">
+      <h2>Что покупают</h2>
+      <p class="stats-note" id="packagesNote"></p>
+      <div class="stats-table-wrap">
+        <table class="stats-table">
+          <thead><tr><th>Покупка</th><th class="num">Оплат</th><th class="num">Сумма</th></tr></thead>
+          <tbody id="packagesTbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="admin-card">
+      <h2>Оплаты по дням, последние 30 дней</h2>
+      <p class="stats-note">Наведите на столбик — покажет число оплат, сумму и новых клиенток за этот день.</p>
+      <div class="stats-chart" id="chart">
+        <div class="stats-chart__max" id="chartMax"></div>
+        <div class="stats-chart__plot" id="chartPlot"></div>
+        <div class="stats-chart__axis"><span id="chartFrom"></span><span id="chartTo"></span></div>
+        <div class="stats-tip" id="chartTip"></div>
+      </div>
+    </div>
+
+    <div class="admin-card">
+      <h2>Партнёры</h2>
+      <p class="stats-note">За всё время. «Пришло по коду» — сколько покупательниц ввели код этого партнёра.</p>
+      <div class="stats-table-wrap">
+        <table class="stats-table">
+          <thead><tr><th>Партнёр</th><th class="num">Кодов выдано</th><th class="num">Пришло по коду</th><th class="num">Оплатили</th><th class="num">Выручка</th></tr></thead>
+          <tbody id="partnersTbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="admin-card">
+      <h2>Последние оплаты</h2>
+      <p class="stats-note">30 последних. Почта видна, чтобы отличать свои тестовые оплаты от настоящих.</p>
+      <div class="stats-table-wrap">
+        <table class="stats-table">
+          <thead><tr><th>Когда</th><th>Кто</th><th>Что</th><th class="num">Сумма</th></tr></thead>
+          <tbody id="recentTbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+(function () {
+  var adminKeyInput = document.getElementById('adminKey');
+  var loadBtn = document.getElementById('loadBtn');
+  var topMsg = document.getElementById('topMsg');
+  var statsBody = document.getElementById('statsBody');
+  var tabs = Array.prototype.slice.call(document.querySelectorAll('.stats-tab'));
+
+  var PACKAGE_TITLES = {
+    OBRAZ_PO_FOTO: 'Один образ — 590 ₽',
+    OBRAZ_PARTNER: 'Один образ по коду партнёра — 370 ₽',
+    PACK_3: 'Пакет «3 образа» — 1 200 ₽',
+    PACK_5: 'Пакет «5 образов» — 1 850 ₽'
+  };
+  var PERIOD_NAMES = { today: 'сегодня', week: 'за 7 дней', month: 'за 30 дней', all: 'за всё время' };
+
+  var data = null;
+  var currentPeriod = 'week';
+
+  function showMsg(text, isError) {
+    topMsg.style.display = text ? 'block' : 'none';
+    topMsg.textContent = text || '';
+    topMsg.className = 'admin-msg' + (isError ? ' is-error' : '');
+  }
+
+  function formatRub(kopecks) {
+    return (kopecks / 100).toLocaleString('ru-RU', { maximumFractionDigits: 2 }) + ' ₽';
+  }
+
+  function formatNum(n) {
+    return Number(n || 0).toLocaleString('ru-RU');
+  }
+
+  // plural(5, 'оплата', 'оплаты', 'оплат') → '5 оплат'
+  function plural(n, one, few, many) {
+    var abs = Math.abs(Number(n || 0)) % 100;
+    var last = abs % 10;
+    var word = (abs > 10 && abs < 20) ? many : last === 1 ? one : (last >= 2 && last <= 4) ? few : many;
+    return formatNum(n) + ' ' + word;
+  }
+
+  function el(tag, className, text) {
+    var node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text !== undefined && text !== null) node.textContent = text;
+    return node;
+  }
+
+  function cell(text, className) {
+    return el('td', className || '', text);
+  }
+
+  function emptyRow(tbody, colSpan, text) {
+    var row = el('tr');
+    var td = el('td', 'stats-empty', text);
+    td.colSpan = colSpan;
+    row.appendChild(td);
+    tbody.appendChild(row);
+  }
+
+  function timeZone() {
+    try { return Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch (e) { return ''; }
+  }
+
+  function load() {
+    var key = adminKeyInput.value.trim();
+    if (!key) {
+      showMsg('Введите админ-ключ.', true);
+      return;
+    }
+    showMsg('Загружаю…');
+    loadBtn.setAttribute('disabled', '');
+
+    fetch('api/admin?action=stats&tz=' + encodeURIComponent(timeZone()), { headers: { 'X-Admin-Key': key } })
+      .then(function (res) { return res.json().then(function (d) { return { ok: res.ok, data: d }; }); })
+      .then(function (r) {
+        if (!r.ok) throw new Error(r.data.error || 'Не получилось загрузить статистику.');
+        showMsg('');
+        data = r.data;
+        statsBody.style.display = 'block';
+        renderPeriod();
+        renderChart();
+        renderPartners();
+        renderRecent();
+      })
+      .catch(function (err) {
+        showMsg(err.message, true);
+      })
+      .then(function () {
+        loadBtn.removeAttribute('disabled');
+      });
+  }
+
+  function tile(label, value, sub, isMain) {
+    var box = el('div', 'stats-tile' + (isMain ? ' stats-tile--main' : ''));
+    box.appendChild(el('div', 'stats-tile__label', label));
+    box.appendChild(el('div', 'stats-tile__value', value));
+    if (sub) box.appendChild(el('div', 'stats-tile__sub', sub));
+    return box;
+  }
+
+  function renderPeriod() {
+    var p = data.periods[currentPeriod];
+    tabs.forEach(function (t) {
+      t.setAttribute('aria-pressed', t.getAttribute('data-period') === currentPeriod ? 'true' : 'false');
+    });
+
+    var tiles = document.getElementById('tiles');
+    tiles.innerHTML = '';
+    tiles.appendChild(tile('Выручка', formatRub(p.paid_kopecks), plural(p.paid_count, 'оплата', 'оплаты', 'оплат'), true));
+    tiles.appendChild(tile('Купили', formatNum(p.payers), 'разных клиенток'));
+    tiles.appendChild(tile('Собрано образов', formatNum(p.looks_built),
+      p.rebuilds ? 'и бесплатных пересборок: ' + formatNum(p.rebuilds) : ''));
+    tiles.appendChild(tile('Новые клиентки', formatNum(p.new_users), 'впервые вошли в кабинет'));
+    tiles.appendChild(tile('Заходили в кабинет', formatNum(p.active_users), 'последний вход в этот период'));
+    tiles.appendChild(tile('Открыли оплату, но не оплатили', formatNum(p.unpaid_count), 'или ещё оплачивают'));
+    tiles.appendChild(tile('Оценки образов', '👍 ' + formatNum(p.likes) + ' · 👎 ' + formatNum(p.dislikes), '«Нравится» / «Не моё»'));
+    tiles.appendChild(tile('Ввели код партнёра', formatNum(p.codes_redeemed), ''));
+    if (p.gifted_looks) tiles.appendChild(tile('Подарено образов', formatNum(p.gifted_looks), 'через «Подарить образ»'));
+    if (currentPeriod === 'all' && data.stock) {
+      tiles.appendChild(tile('Образов в запасе у клиенток', formatNum(data.stock.looks),
+        'оплачены, ещё не собраны · у ' + formatNum(data.stock.holders) + ' чел.'));
+    }
+
+    renderPackages(p);
+  }
+
+  function renderPackages(p) {
+    document.getElementById('packagesNote').textContent = 'Оплаты ' + PERIOD_NAMES[currentPeriod] + '.';
+    var tbody = document.getElementById('packagesTbody');
+    tbody.innerHTML = '';
+    var codes = Object.keys(PACKAGE_TITLES);
+    Object.keys(p.byPackage).forEach(function (code) {
+      if (codes.indexOf(code) === -1) codes.push(code);
+    });
+    codes.forEach(function (code) {
+      var item = p.byPackage[code] || { n: 0, kopecks: 0 };
+      var row = el('tr');
+      row.appendChild(cell(PACKAGE_TITLES[code] || code));
+      row.appendChild(cell(formatNum(item.n), 'num'));
+      row.appendChild(cell(formatRub(item.kopecks), 'num'));
+      tbody.appendChild(row);
+    });
+  }
+
+  function formatDay(isoDay, withWeekday) {
+    var parts = isoDay.split('-');
+    var d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+    return d.toLocaleDateString('ru-RU', withWeekday
+      ? { weekday: 'short', day: 'numeric', month: 'long' }
+      : { day: 'numeric', month: 'short' });
+  }
+
+  function renderChart() {
+    var plot = document.getElementById('chartPlot');
+    var tip = document.getElementById('chartTip');
+    var chart = document.getElementById('chart');
+    plot.innerHTML = '';
+    var days = data.daily;
+    var max = days.reduce(function (m, d) { return Math.max(m, d.paid_kopecks); }, 0);
+
+    document.getElementById('chartMax').textContent = max ? 'Больше всего за день: ' + formatRub(max) : 'За 30 дней оплат пока не было.';
+    document.getElementById('chartFrom').textContent = days.length ? formatDay(days[0].day) : '';
+    document.getElementById('chartTo').textContent = days.length ? formatDay(days[days.length - 1].day) : '';
+
+    days.forEach(function (d) {
+      var bar = el('div', 'stats-bar');
+      bar.tabIndex = 0;
+      var label = formatDay(d.day, true) + ': ' + plural(d.paid_count, 'оплата', 'оплаты', 'оплат') + ', ' + formatRub(d.paid_kopecks) +
+        ', новых клиенток ' + formatNum(d.new_users);
+      bar.setAttribute('aria-label', label);
+      var fill = el('div', 'stats-bar__fill');
+      fill.style.height = max ? Math.max(d.paid_kopecks ? 2 : 0, Math.round(d.paid_kopecks / max * 100)) + '%' : '0';
+      bar.appendChild(fill);
+
+      function show() {
+        tip.textContent = '';
+        tip.appendChild(el('div', '', formatDay(d.day, true)));
+        tip.appendChild(el('div', '', plural(d.paid_count, 'оплата', 'оплаты', 'оплат') + ' · ' + formatRub(d.paid_kopecks)));
+        tip.appendChild(el('div', '', 'Новых клиенток: ' + formatNum(d.new_users)));
+        var chartBox = chart.getBoundingClientRect();
+        var barBox = bar.getBoundingClientRect();
+        var plotBox = plot.getBoundingClientRect();
+        var x = barBox.left + barBox.width / 2 - chartBox.left;
+        // не даём подсказке вылезти за край карточки на телефоне
+        x = Math.min(Math.max(x, 90), chartBox.width - 90);
+        tip.style.left = x + 'px';
+        tip.style.top = (plotBox.top - chartBox.top - 6) + 'px';
+        tip.style.display = 'block';
+      }
+      function hide() { tip.style.display = 'none'; }
+      bar.addEventListener('mouseenter', show);
+      bar.addEventListener('focus', show);
+      bar.addEventListener('mouseleave', hide);
+      bar.addEventListener('blur', hide);
+      plot.appendChild(bar);
+    });
+  }
+
+  function renderPartners() {
+    var tbody = document.getElementById('partnersTbody');
+    tbody.innerHTML = '';
+    if (!data.partners.length) {
+      emptyRow(tbody, 5, 'Партнёров пока нет.');
+      return;
+    }
+    data.partners.forEach(function (p) {
+      var row = el('tr');
+      var nameCell = el('td');
+      nameCell.appendChild(el('strong', '', p.name));
+      if (p.status !== 'active') nameCell.appendChild(el('div', 'muted', 'неактивен'));
+      row.appendChild(nameCell);
+      row.appendChild(cell(formatNum(p.codes_issued), 'num'));
+      row.appendChild(cell(formatNum(p.codes_redeemed), 'num'));
+      row.appendChild(cell(formatNum(p.orders_completed), 'num'));
+      row.appendChild(cell(formatRub(p.revenue_kopecks), 'num'));
+      tbody.appendChild(row);
+    });
+  }
+
+  function renderRecent() {
+    var tbody = document.getElementById('recentTbody');
+    tbody.innerHTML = '';
+    if (!data.recentPayments.length) {
+      emptyRow(tbody, 4, 'Оплат пока не было.');
+      return;
+    }
+    data.recentPayments.forEach(function (p) {
+      var row = el('tr');
+      row.appendChild(cell(new Date(p.paid_at).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })));
+      row.appendChild(cell(p.email));
+      var whatCell = el('td', '', PACKAGE_TITLES[p.package_code] || p.package_code);
+      if (p.partner_name) whatCell.appendChild(el('div', 'muted', 'партнёр: ' + p.partner_name));
+      row.appendChild(whatCell);
+      row.appendChild(cell(formatRub(p.amount_kopecks), 'num'));
+      tbody.appendChild(row);
+    });
+  }
+
+  tabs.forEach(function (t) {
+    t.addEventListener('click', function () {
+      currentPeriod = t.getAttribute('data-period');
+      if (data) renderPeriod();
+    });
+  });
+
+  loadBtn.addEventListener('click', load);
+  adminKeyInput.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') load();
+  });
+})();
+</script>
+
+</body>
+</html>
