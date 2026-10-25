@@ -13,6 +13,7 @@
 #   - вход по SSH только по ключу (если ключ уже добавлен);
 #   - автообновления безопасности; файл подкачки 1 ГБ;
 #   - резервная копия базы каждую ночь в /var/backups/stil (хранятся 14 дней);
+#   - каждые 5 минут — сверка «зависших» оплат с Robokassa (запрос к сайту);
 #   - применяет схему /root/schema.sql.
 # В конце пишет строку подключения и сертификат в /root/stil-connection.txt
 # (только для root) — их нужно вставить в Vercel: DATABASE_URL и DATABASE_CA.
@@ -125,6 +126,11 @@ fi
 mkdir -p /var/backups/stil && chown postgres:postgres /var/backups/stil && chmod 700 /var/backups/stil
 cat > /etc/cron.d/stil-backup <<'CRON'
 30 2 * * * postgres pg_dump -Fc stil > /var/backups/stil/stil-$(date +\%F).dump && find /var/backups/stil -name 'stil-*.dump' -mtime +14 -delete
+CRON
+
+# ---- сверка «зависших» оплат с Robokassa каждые 5 минут (lib/reconcile.js, api/files.js) ----
+cat > /etc/cron.d/stil-reconcile <<'CRON'
+*/5 * * * * root curl -s -m 60 -o /dev/null 'https://www.stil-shag.ru/api/files?action=reconcile'
 CRON
 
 echo

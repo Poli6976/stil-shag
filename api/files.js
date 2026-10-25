@@ -6,6 +6,11 @@
      ?b=avatars&p=…&v=…     — аватарка (публичная, как раньше);
      ?b=site-looks&p=…      — пример образа на сайте (публичный).
 
+   GET ?action=reconcile — сверка «зависших» оплат с Robokassa (lib/reconcile.js):
+   каждые 5 минут её дёргает cron на нашем сервере в Москве. Без секрета, но не
+   чаще раза в 50 секунд на весь сайт — повторный вызов ничего не меняет,
+   а чужие частые вызовы не дадут лишних запросов к Robokassa.
+
    GET ?action=cleanup — уборка по расписанию (Vercel Cron, vercel.json):
    старые коды входа, истёкшие сессии, счётчики лимитов. Если задан
    CRON_SECRET, выполняется только с ним (так его вызывает Vercel Cron).
@@ -17,6 +22,8 @@
 const auth = require('../lib/auth');
 const db = require('../lib/db');
 const storage = require('../lib/storage');
+const { checkRateLimit } = require('../lib/rateLimit');
+const { reconcilePendingPayments } = require('../lib/reconcile');
 
 module.exports = async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -28,6 +35,21 @@ module.exports = async function handler(req, res) {
     return;
   }
   var q = req.query || {};
+
+  if (q.action === 'reconcile') {
+    var allowed = await checkRateLimit(null, 'reconcile-global', { windowSeconds: 50, maxHits: 1 });
+    if (!allowed) {
+      res.status(429).json({ error: 'Сверка уже идёт, попробуйте через минуту.' });
+      return;
+    }
+    try {
+      res.status(200).json(await reconcilePendingPayments());
+    } catch (err) {
+      console.error('files reconcile error:', err && err.message);
+      res.status(500).json({ error: 'Сверка не удалась.' });
+    }
+    return;
+  }
 
   if (q.action === 'cleanup') {
     if (process.env.CRON_SECRET) {
