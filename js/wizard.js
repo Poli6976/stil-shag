@@ -1362,7 +1362,10 @@
         if (!r.res.ok || !r.data.confirmationUrl) throw new Error(r.data.error || 'Не получилось перейти к оплате.');
         pending.orderId = r.data.orderId;
         writePending(pending);
-        window.location.href = r.data.confirmationUrl;
+        // цель для Метрики (js/metrika.js) успевает уйти до перехода на Robokassa
+        (window.stilGoal || function (n, done) { done(); })('pay_start', function () {
+          window.location.href = r.data.confirmationUrl;
+        });
       })
       .catch(function (err) {
         clearPending();
@@ -1491,6 +1494,7 @@
         });
         rememberAfterResult();
         loadPurchase();
+        if (window.stilGoal) window.stilGoal('look_built'); // js/metrika.js
       })
       .catch(function (err) {
         /* Оплаченный заказ занят (или вернулся в запас) — повторно по той же отметке не собрать. */
@@ -1720,6 +1724,7 @@
             setNextEnabled(!!answers.item.trim());
             photoStatus.textContent = 'Готово — проверьте описание и уточните цвет вещи, если он неточный.';
             photoStatus.className = 'wizard-photo-status wizard-photo-status--ok';
+            if (window.stilGoal) window.stilGoal('photo_uploaded'); // js/metrika.js
           })
           .catch(function (err) {
             photoStatus.textContent = (err && err.message) || 'Не получилось разобрать фото — опишите вещь текстом.';

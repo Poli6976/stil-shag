@@ -98,6 +98,7 @@
       return post('verify', { email: params && params.email, code: params && params.token })
         .then(function (data) {
           setSession(data.session, 'SIGNED_IN');
+          if (window.stilGoal) window.stilGoal('login'); // js/metrika.js
           return { data: { session: data.session }, error: null };
         }, function (err) {
           return { data: { session: null }, error: err };

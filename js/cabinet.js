@@ -135,6 +135,7 @@
           if (consentLabel) consentLabel.style.display = 'none';
           showCodeMsg('✓ Код принят — следующий образ обойдётся в 370 ₽ вместо 590 ₽.', 'success');
           renderStatus();
+          if (window.stilGoal) window.stilGoal('partner_code'); // js/metrika.js
         })
         .catch(function (err) {
           showCodeMsg(err.message, 'error');

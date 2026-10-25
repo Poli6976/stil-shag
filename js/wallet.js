@@ -360,7 +360,10 @@
             try {
               localStorage.setItem(PENDING_PACK_KEY, JSON.stringify({ orderId: r.data.orderId, at: Date.now() }));
             } catch (e) {}
-            window.location.href = r.data.confirmationUrl;
+            // цель для Метрики (js/metrika.js) успевает уйти до перехода на Robokassa
+            (window.stilGoal || function (n, done) { done(); })('pay_start', function () {
+              window.location.href = r.data.confirmationUrl;
+            });
           })
           .catch(function (err) { showMsg(msg, err.message, true); })
           .then(function () { btn.removeAttribute('disabled'); });
