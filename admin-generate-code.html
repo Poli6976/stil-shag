@@ -54,7 +54,7 @@
       Служебная страница, не для покупательниц — не ссылается ниоткуда на сайте. Заведите партнёра
       и выдайте ему сразу нужное количество кодов «Примерки» — партнёр сам передаёт их покупательницам
       по мере продаж, без вашего участия в каждой отдельной сделке. Здесь же видно, сколько кодов
-      выдано и сколько уже погашено.
+      выдано и сколько уже погашено. Ниже можно подарить продавцу пробный образ по его почте.
     </p>
     <div class="admin-field">
       <label for="adminKey">Админ-ключ</label>
@@ -84,6 +84,28 @@
       <button type="submit" class="btn-3d btn-3d--rect">Добавить партнёра</button>
     </form>
     <div class="admin-msg" id="addMsg" style="display:none"></div>
+  </div>
+
+  <div class="admin-card" id="giftCard" style="display:none">
+    <h2>Подарить образ</h2>
+    <p>
+      Образ появится в запасе у человека с этой почтой. Заходить на сайт заранее ему не нужно:
+      когда он войдёт по коду из письма с этой почтой, образ уже будет ждать в кабинете.
+    </p>
+    <form id="giftForm">
+      <div class="admin-row">
+        <div class="admin-field">
+          <label for="giftEmail">Почта *</label>
+          <input type="email" id="giftEmail" required placeholder="seller@example.com" autocomplete="off">
+        </div>
+        <div class="admin-field">
+          <label for="giftCount">Сколько образов</label>
+          <input type="number" id="giftCount" min="1" max="5" value="1">
+        </div>
+      </div>
+      <button type="submit" class="btn-3d btn-3d--rect">Подарить образ</button>
+    </form>
+    <div class="admin-msg" id="giftMsg" style="display:none"></div>
   </div>
 
   <div class="admin-card" id="partnersCard" style="display:none">
@@ -116,6 +138,9 @@
   var partnerTbody = document.getElementById('partnerTbody');
   var addPartnerForm = document.getElementById('addPartnerForm');
   var addMsg = document.getElementById('addMsg');
+  var giftCard = document.getElementById('giftCard');
+  var giftForm = document.getElementById('giftForm');
+  var giftMsg = document.getElementById('giftMsg');
 
   function showMsg(el, text, isError) {
     el.style.display = text ? 'block' : 'none';
@@ -145,6 +170,7 @@
         if (!r.ok) throw new Error(r.data.error || 'Не получилось загрузить партнёров.');
         showMsg(topMsg, '');
         addPartnerCard.style.display = 'block';
+        giftCard.style.display = 'block';
         partnersCard.style.display = 'block';
         renderPartners(r.data.partners);
       })
@@ -374,6 +400,40 @@
       })
       .catch(function (err) {
         showMsg(addMsg, err.message, true);
+      });
+  });
+
+  giftForm.addEventListener('submit', function (e) {
+    e.preventDefault();
+    if (!adminKey()) {
+      showMsg(giftMsg, 'Введите админ-ключ выше.', true);
+      return;
+    }
+    var email = document.getElementById('giftEmail').value.trim();
+    var count = parseInt(document.getElementById('giftCount').value, 10) || 1;
+    var sure = window.confirm('Подарить ' + count + ' образ(а) на почту ' + email + '?');
+    if (!sure) return;
+    var btn = giftForm.querySelector('button[type="submit"]');
+    btn.setAttribute('disabled', '');
+    showMsg(giftMsg, 'Дарю…');
+
+    fetch('api/admin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'gift-look', adminKey: adminKey(), email: email, count: count })
+    })
+      .then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); })
+      .then(function (r) {
+        if (!r.ok) throw new Error(r.data.error || 'Не получилось подарить образ.');
+        showMsg(giftMsg, 'Готово: ' + r.data.email + ' — образов в запасе: ' + r.data.looksInStock +
+          (r.data.newUser ? '. Аккаунта ещё не было — заведён, войти можно по коду из письма.' : '.'));
+        giftForm.reset();
+      })
+      .catch(function (err) {
+        showMsg(giftMsg, err.message, true);
+      })
+      .then(function () {
+        btn.removeAttribute('disabled');
       });
   });
 

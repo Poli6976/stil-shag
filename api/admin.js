@@ -34,6 +34,10 @@
        в хранилище site-looks (lib/storage.js), caption — подпись под картинкой
      POST body {action:'delete-site-look', adminKey, id}
        — удалить пример образа насовсем (файл из хранилища + запись)
+     POST body {action:'gift-look', adminKey, email, count}
+       — подарить образы (1–5) в запас по email: продавцу-партнёру на пробу.
+       Аккаунта может ещё не быть — он заводится сразу, и когда человек
+       войдёт по коду с этой почтой, образы уже ждут в кабинете.
    ============================================================================ */
 
 const crypto = require('crypto');
@@ -41,6 +45,7 @@ const { checkAdminKey } = require('../lib/adminAuth');
 const { generateCode, sanitizeRef } = require('../lib/partnerCode');
 const db = require('../lib/db');
 const storage = require('../lib/storage');
+const { normalizeEmail } = require('../lib/auth');
 
 const SITE_LOOKS_BUCKET = 'site-looks';
 
@@ -70,6 +75,9 @@ module.exports = async function handler(req, res) {
   }
   if (req.method === 'POST' && action === 'delete-site-look') {
     return handleDeleteSiteLook(req, res);
+  }
+  if (req.method === 'POST' && action === 'gift-look') {
+    return handleGiftLook(req, res);
   }
   res.status(400).json({ error: 'Неизвестное действие.' });
 };
@@ -373,5 +381,48 @@ async function handleDeleteSiteLook(req, res) {
   } catch (err) {
     console.error('admin delete-site-look error:', err);
     res.status(500).json({ error: 'Не получилось удалить образ.' });
+  }
+}
+
+/* Подарок образов в запас по email. Заказ GIFT_LOOK за 0 ₽ — для истории (видно, кому и когда дарили). */
+async function handleGiftLook(req, res) {
+  if (!checkAdminKey(req.body && req.body.adminKey)) {
+    res.status(401).json({ error: 'Неверный админ-ключ.' });
+    return;
+  }
+  if (!requireDbEnv(res)) return;
+
+  var email = normalizeEmail(req.body && req.body.email);
+  if (!email) {
+    res.status(400).json({ error: 'Проверьте адрес почты — похоже, в нём опечатка.' });
+    return;
+  }
+  var count = parseInt((req.body && req.body.count) || 1, 10);
+  if (!count || count < 1 || count > 5) {
+    res.status(400).json({ error: 'Подарить можно от 1 до 5 образов за раз.' });
+    return;
+  }
+
+  try {
+    var result = await db.transaction(async function (client) {
+      var existing = (await client.query('select id from users where email = $1', [email])).rows[0];
+      var userId = existing
+        ? existing.id
+        : (await client.query('insert into users (email) values ($1) returning id', [email])).rows[0].id;
+      await client.query('insert into wallets (user_id) values ($1) on conflict (user_id) do nothing', [userId]);
+      var wallet = (await client.query(
+        'update wallets set looks_in_stock = looks_in_stock + $2, updated_at = now() where user_id = $1 returning looks_in_stock',
+        [userId, count]
+      )).rows[0];
+      await client.query(
+        "insert into orders (user_id, package_code, price_kopecks, status, done_at, answers) values ($1, 'GIFT_LOOK', 0, 'done', now(), $2::jsonb)",
+        [userId, JSON.stringify({ gift: count })]
+      );
+      return { newUser: !existing, looksInStock: wallet.looks_in_stock };
+    });
+    res.status(200).json({ ok: true, email: email, newUser: result.newUser, looksInStock: result.looksInStock });
+  } catch (err) {
+    console.error('admin gift-look error:', err && err.message);
+    res.status(500).json({ error: 'Не получилось подарить образ.' });
   }
 }
