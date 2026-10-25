@@ -58,6 +58,49 @@
     } catch (e) {}
   }
 
+  /* Пакет оплачен, а уведомление Robokassa не дошло (бывало: «timed out»)? Запоминаем заказ пакета перед
+     уходом на оплату и после возврата спрашиваем его статус: api/wallet/summary?order= сам сверит оплату
+     с Robokassa и начислит образы в запас — как анкета делает для одного образа (stil.pendingLook). */
+  var PENDING_PACK_KEY = 'stil.pendingPack';
+  var PENDING_PACK_TTL = 3 * 60 * 60 * 1000;
+
+  function readPendingPack() {
+    try {
+      var p = JSON.parse(localStorage.getItem(PENDING_PACK_KEY) || 'null');
+      if (p && p.orderId && Date.now() - p.at < PENDING_PACK_TTL) return p;
+      localStorage.removeItem(PENDING_PACK_KEY);
+    } catch (e) {}
+    return null;
+  }
+
+  function checkPendingPack(session, attempt) {
+    var pending = readPendingPack();
+    if (!pending) return;
+    var msg = document.getElementById('topupMsg');
+    authedFetch(session, 'api/wallet/summary?order=' + encodeURIComponent(pending.orderId))
+      .then(function (res) { return res.ok ? res.json() : null; })
+      .then(function (data) {
+        var status = data && data.order && data.order.status;
+        if (status === 'done') {
+          try { localStorage.removeItem(PENDING_PACK_KEY); } catch (e) {}
+          showMsg(msg, 'Оплата пакета прошла — образы добавлены в запас.');
+          loadWallet(session);
+          return;
+        }
+        if (!data || status !== 'created') {
+          try { localStorage.removeItem(PENDING_PACK_KEY); } catch (e) {}
+          return;
+        }
+        if ((attempt || 0) < 12) {
+          showMsg(msg, 'Проверяем оплату пакета…');
+          setTimeout(function () { checkPendingPack(session, (attempt || 0) + 1); }, 5000);
+        } else {
+          showMsg(msg, 'Оплата пакета пока не подтверждена. Если вы оплатили — обновите страницу через пару минут.');
+        }
+      })
+      .catch(function () {});
+  }
+
   /* ---------- аватарка клиентки (api/auth.js, action=profile/set-avatar/remove-avatar) ---------- */
 
   function renderAvatar(url) {
@@ -199,6 +242,7 @@
       if (reviewSection) reviewSection.style.display = 'block';
       if (emailEl) emailEl.textContent = session.user.email;
       loadWallet(session);
+      checkPendingPack(session, 0);
       loadAvatar(session);
       if (window.stilSavedLooks) window.stilSavedLooks.load(session);
     } else {
@@ -313,6 +357,9 @@
           .then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); })
           .then(function (r) {
             if (!r.ok || !r.data.confirmationUrl) throw new Error((r.data && r.data.error) || 'Не получилось создать платёж.');
+            try {
+              localStorage.setItem(PENDING_PACK_KEY, JSON.stringify({ orderId: r.data.orderId, at: Date.now() }));
+            } catch (e) {}
             window.location.href = r.data.confirmationUrl;
           })
           .catch(function (err) { showMsg(msg, err.message, true); })
