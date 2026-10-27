@@ -58,6 +58,7 @@
   .stats-bar:focus { outline: none; }
   .stats-chart__axis { display: flex; justify-content: space-between; font-family: var(--font-body); font-size: .74rem; color: var(--text-faint); margin-top: 6px; }
   .stats-chart__max { font-family: var(--font-body); font-size: .74rem; color: var(--text-faint); margin-bottom: 4px; }
+  .stats-nocount { display: flex; gap: 8px; align-items: center; font-family: var(--font-body); font-size: .85rem; color: var(--text-muted); margin-top: 12px; cursor: pointer; }
   .stats-tip { position: absolute; pointer-events: none; padding: 8px 10px; border-radius: 10px; background: var(--text-primary); color: #fff; font-family: var(--font-body); font-size: .8rem; line-height: 1.4; white-space: nowrap; transform: translate(-50%, -100%); display: none; z-index: 2; }
 
   @media (max-width: 560px) {
@@ -74,8 +75,8 @@
     <h1>Статистика</h1>
     <p>
       Служебная страница, не для покупательниц — ниоткуда на сайте на неё нет ссылки. Цифры берутся
-      прямо из базы: оплаты, заказы, собранные образы. Сколько людей просто заходит на сайт, здесь не
-      видно — это покажет Яндекс.Метрика, когда её подключим.
+      прямо из базы: заходы на сайт, оплаты, заказы, собранные образы. Заходы считает сам сайт, без
+      cookie, — поэтому здесь все посетители, а не только нажавшие «Разрешить» для Метрики.
     </p>
     <div class="admin-field">
       <label for="adminKey">Админ-ключ</label>
@@ -84,6 +85,10 @@
     <button type="button" id="loadBtn" class="btn-3d btn-3d--rect">Показать статистику</button>
     <div class="admin-msg" id="topMsg" style="display:none"></div>
     <div class="admin-links"><a href="admin-generate-code.html">Партнёры и коды →</a></div>
+    <label class="stats-nocount">
+      <input type="checkbox" id="noCountToggle">
+      Не считать мои заходы на сайт с этого браузера
+    </label>
   </div>
 
   <div id="statsBody" style="display:none">
@@ -100,6 +105,39 @@
     </div>
 
     <div class="admin-card">
+      <h2>Откуда приходят</h2>
+      <p class="stats-note" id="sourcesNote"></p>
+      <div class="stats-table-wrap">
+        <table class="stats-table">
+          <thead><tr><th>Источник</th><th class="num">Посещений</th><th class="num">Просмотров</th></tr></thead>
+          <tbody id="sourcesTbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="admin-card">
+      <h2>Какие страницы смотрят</h2>
+      <p class="stats-note">«Посещений» — сколько раз с этой страницы начали знакомство с сайтом.</p>
+      <div class="stats-table-wrap">
+        <table class="stats-table">
+          <thead><tr><th>Страница</th><th class="num">Просмотров</th><th class="num">Посещений</th></tr></thead>
+          <tbody id="pagesTbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="admin-card">
+      <h2>Посещения по дням, последние 30 дней</h2>
+      <p class="stats-note">Наведите на столбик — покажет число посещений за этот день.</p>
+      <div class="stats-chart" id="visitsChart">
+        <div class="stats-chart__max"></div>
+        <div class="stats-chart__plot"></div>
+        <div class="stats-chart__axis"><span class="stats-chart__from"></span><span class="stats-chart__to"></span></div>
+        <div class="stats-tip"></div>
+      </div>
+    </div>
+
+    <div class="admin-card">
       <h2>Что покупают</h2>
       <p class="stats-note" id="packagesNote"></p>
       <div class="stats-table-wrap">
@@ -113,11 +151,11 @@
     <div class="admin-card">
       <h2>Оплаты по дням, последние 30 дней</h2>
       <p class="stats-note">Наведите на столбик — покажет число оплат, сумму и новых клиенток за этот день.</p>
-      <div class="stats-chart" id="chart">
-        <div class="stats-chart__max" id="chartMax"></div>
-        <div class="stats-chart__plot" id="chartPlot"></div>
-        <div class="stats-chart__axis"><span id="chartFrom"></span><span id="chartTo"></span></div>
-        <div class="stats-tip" id="chartTip"></div>
+      <div class="stats-chart" id="paymentsChart">
+        <div class="stats-chart__max"></div>
+        <div class="stats-chart__plot"></div>
+        <div class="stats-chart__axis"><span class="stats-chart__from"></span><span class="stats-chart__to"></span></div>
+        <div class="stats-tip"></div>
       </div>
     </div>
 
@@ -161,6 +199,39 @@
     PACK_5: 'Пакет «5 образов» — 1 850 ₽'
   };
   var PERIOD_NAMES = { today: 'сегодня', week: 'за 7 дней', month: 'за 30 дней', all: 'за всё время' };
+  // источники — как их записывает lib/visits.js
+  var SOURCE_TITLES = {
+    direct: 'Напрямую — ссылка из мессенджера, закладка или ввели адрес',
+    yandex: 'Яндекс',
+    google: 'Google',
+    search: 'Другой поисковик',
+    vk: 'ВКонтакте',
+    telegram: 'Telegram',
+    max: 'Макс',
+    whatsapp: 'WhatsApp',
+    instagram: 'Instagram',
+    ok: 'Одноклассники',
+    dzen: 'Дзен',
+    avito: 'Авито',
+    mail: 'Mail.ru',
+    other: 'Другие сайты'
+  };
+  var PAGE_TITLES = {
+    '/': 'Главная',
+    '/obraz-po-foto': 'Образ по фото',
+    '/cabinet': 'Личный кабинет',
+    '/prices': 'Цены',
+    '/how-it-works': 'Как это работает',
+    '/faq': 'Вопросы и ответы',
+    '/about': 'О проекте',
+    '/primerka': 'Программа «Примерка»',
+    '/structure': 'Структура сайта',
+    '/legal-privacy': 'Политика конфиденциальности',
+    '/legal-agreement': 'Пользовательское соглашение',
+    '/legal-offer': 'Оферта',
+    '/legal-partners': 'Партнёрское соглашение'
+  };
+  var NO_COUNT_KEY = 'stil.noCount'; // его же читает js/metrika.js
 
   var data = null;
   var currentPeriod = 'week';
@@ -227,7 +298,7 @@
         data = r.data;
         statsBody.style.display = 'block';
         renderPeriod();
-        renderChart();
+        renderCharts();
         renderPartners();
         renderRecent();
       })
@@ -255,6 +326,7 @@
 
     var tiles = document.getElementById('tiles');
     tiles.innerHTML = '';
+    tiles.appendChild(tile('Посещения сайта', formatNum(p.visits), 'просмотров страниц: ' + formatNum(p.views), true));
     tiles.appendChild(tile('Выручка', formatRub(p.paid_kopecks), plural(p.paid_count, 'оплата', 'оплаты', 'оплат'), true));
     tiles.appendChild(tile('Купили', formatNum(p.payers), 'разных клиенток'));
     tiles.appendChild(tile('Собрано образов', formatNum(p.looks_built),
@@ -271,6 +343,51 @@
     }
 
     renderPackages(p);
+    renderSources(p);
+    renderPages(p);
+  }
+
+  function sourceTitle(source) {
+    if (source.indexOf('tag:') === 0) return 'Ссылка с меткой «' + source.slice(4) + '»';
+    return SOURCE_TITLES[source] || source;
+  }
+
+  function renderSources(p) {
+    document.getElementById('sourcesNote').textContent = 'Посещения ' + PERIOD_NAMES[currentPeriod] +
+      '. Из мессенджеров браузер часто не сообщает, откуда пришёл человек, — такие заходы попадают в «Напрямую».';
+    var tbody = document.getElementById('sourcesTbody');
+    tbody.innerHTML = '';
+    var rows = p.sources.slice().sort(function (a, b) { return b.visits - a.visits || b.views - a.views; });
+    if (!rows.length) {
+      emptyRow(tbody, 3, 'Заходов за этот период пока нет.');
+      return;
+    }
+    rows.forEach(function (s) {
+      var row = el('tr');
+      row.appendChild(cell(sourceTitle(s.source)));
+      row.appendChild(cell(formatNum(s.visits), 'num'));
+      row.appendChild(cell(formatNum(s.views), 'num'));
+      tbody.appendChild(row);
+    });
+  }
+
+  function renderPages(p) {
+    var tbody = document.getElementById('pagesTbody');
+    tbody.innerHTML = '';
+    var rows = p.pages.slice().sort(function (a, b) { return b.views - a.views || b.visits - a.visits; });
+    if (!rows.length) {
+      emptyRow(tbody, 3, 'Заходов за этот период пока нет.');
+      return;
+    }
+    rows.forEach(function (pg) {
+      var row = el('tr');
+      var nameCell = el('td', '', PAGE_TITLES[pg.path] || pg.path);
+      if (PAGE_TITLES[pg.path]) nameCell.appendChild(el('div', 'muted', pg.path === '/' ? '/' : pg.path + '.html'));
+      row.appendChild(nameCell);
+      row.appendChild(cell(formatNum(pg.views), 'num'));
+      row.appendChild(cell(formatNum(pg.visits), 'num'));
+      tbody.appendChild(row);
+    });
   }
 
   function renderPackages(p) {
@@ -299,33 +416,47 @@
       : { day: 'numeric', month: 'short' });
   }
 
-  function renderChart() {
-    var plot = document.getElementById('chartPlot');
-    var tip = document.getElementById('chartTip');
-    var chart = document.getElementById('chart');
+  function renderCharts() {
+    renderChart(document.getElementById('visitsChart'), {
+      value: function (d) { return Number(d.visits) || 0; },
+      maxText: function (max) { return max ? 'Больше всего за день: ' + plural(max, 'посещение', 'посещения', 'посещений') : 'За 30 дней заходов пока не было.'; },
+      lines: function (d) { return [plural(d.visits, 'посещение', 'посещения', 'посещений')]; }
+    });
+    renderChart(document.getElementById('paymentsChart'), {
+      value: function (d) { return Number(d.paid_kopecks) || 0; },
+      maxText: function (max) { return max ? 'Больше всего за день: ' + formatRub(max) : 'За 30 дней оплат пока не было.'; },
+      lines: function (d) {
+        return [plural(d.paid_count, 'оплата', 'оплаты', 'оплат') + ' · ' + formatRub(d.paid_kopecks), 'Новых клиенток: ' + formatNum(d.new_users)];
+      }
+    });
+  }
+
+  /* Столбики по дням, одна серия. cfg: value(d) — высота, maxText(max), lines(d) — строки подсказки. */
+  function renderChart(chart, cfg) {
+    var plot = chart.querySelector('.stats-chart__plot');
+    var tip = chart.querySelector('.stats-tip');
     plot.innerHTML = '';
     var days = data.daily;
-    var max = days.reduce(function (m, d) { return Math.max(m, d.paid_kopecks); }, 0);
+    var max = days.reduce(function (m, d) { return Math.max(m, cfg.value(d)); }, 0);
 
-    document.getElementById('chartMax').textContent = max ? 'Больше всего за день: ' + formatRub(max) : 'За 30 дней оплат пока не было.';
-    document.getElementById('chartFrom').textContent = days.length ? formatDay(days[0].day) : '';
-    document.getElementById('chartTo').textContent = days.length ? formatDay(days[days.length - 1].day) : '';
+    chart.querySelector('.stats-chart__max').textContent = cfg.maxText(max);
+    chart.querySelector('.stats-chart__from').textContent = days.length ? formatDay(days[0].day) : '';
+    chart.querySelector('.stats-chart__to').textContent = days.length ? formatDay(days[days.length - 1].day) : '';
 
     days.forEach(function (d) {
       var bar = el('div', 'stats-bar');
       bar.tabIndex = 0;
-      var label = formatDay(d.day, true) + ': ' + plural(d.paid_count, 'оплата', 'оплаты', 'оплат') + ', ' + formatRub(d.paid_kopecks) +
-        ', новых клиенток ' + formatNum(d.new_users);
-      bar.setAttribute('aria-label', label);
+      var lines = cfg.lines(d);
+      bar.setAttribute('aria-label', formatDay(d.day, true) + ': ' + lines.join(', '));
       var fill = el('div', 'stats-bar__fill');
-      fill.style.height = max ? Math.max(d.paid_kopecks ? 2 : 0, Math.round(d.paid_kopecks / max * 100)) + '%' : '0';
+      var v = cfg.value(d);
+      fill.style.height = max ? Math.max(v ? 2 : 0, Math.round(v / max * 100)) + '%' : '0';
       bar.appendChild(fill);
 
       function show() {
         tip.textContent = '';
         tip.appendChild(el('div', '', formatDay(d.day, true)));
-        tip.appendChild(el('div', '', plural(d.paid_count, 'оплата', 'оплаты', 'оплат') + ' · ' + formatRub(d.paid_kopecks)));
-        tip.appendChild(el('div', '', 'Новых клиенток: ' + formatNum(d.new_users)));
+        lines.forEach(function (line) { tip.appendChild(el('div', '', line)); });
         var chartBox = chart.getBoundingClientRect();
         var barBox = bar.getBoundingClientRect();
         var plotBox = plot.getBoundingClientRect();
@@ -390,6 +521,15 @@
       currentPeriod = t.getAttribute('data-period');
       if (data) renderPeriod();
     });
+  });
+
+  var noCountToggle = document.getElementById('noCountToggle');
+  try { noCountToggle.checked = localStorage.getItem(NO_COUNT_KEY) === '1'; } catch (e) {}
+  noCountToggle.addEventListener('change', function () {
+    try {
+      if (noCountToggle.checked) localStorage.setItem(NO_COUNT_KEY, '1');
+      else localStorage.removeItem(NO_COUNT_KEY);
+    } catch (e) {}
   });
 
   loadBtn.addEventListener('click', load);

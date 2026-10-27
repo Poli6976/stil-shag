@@ -293,6 +293,17 @@ create table if not exists site_looks (
 
 create index if not exists site_looks_sort_idx on site_looks (sort_order, created_at desc);
 
+-- Свой счётчик заходов без cookie (lib/visits.js — он же создаёт эту таблицу сам при первом
+-- заходе, отдельно запускать не нужно). Только счётчики по часам: ни IP, ни устройства.
+create table if not exists page_views (
+  hour    timestamptz not null,
+  path    text not null,
+  source  text not null,
+  views   integer not null default 0,
+  visits  integer not null default 0,
+  primary key (hour, path, source)
+);
+
 -- ---------------------------------------------------------------------------
 -- Заказ + ожидающий платёж одной транзакцией (api/payments/create.js).
 -- ---------------------------------------------------------------------------

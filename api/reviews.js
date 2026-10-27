@@ -21,6 +21,9 @@
        — одобрить отзыв, станет виден всем.
      POST body {action:'reject', adminKey, id}
        — отклонить и удалить отзыв безвозвратно.
+     POST ?action=hit body {path, first, referrer, tag}
+       — свой счётчик заходов без cookie (lib/visits.js, js/metrika.js). Сюда, а не
+       в отдельный файл, — по той же причине лимита функций.
 
    Один файл вместо нескольких — на Vercel Hobby жёсткий лимит 12
    serverless-функций на деплой, слот под этот файл освобождён слиянием
@@ -32,6 +35,7 @@ const { checkAdminKey } = require('../lib/adminAuth');
 const { checkRateLimit } = require('../lib/rateLimit');
 const db = require('../lib/db');
 const storage = require('../lib/storage');
+const visits = require('../lib/visits');
 
 module.exports = async function handler(req, res) {
   var action = (req.query && req.query.action) || (req.body && req.body.action);
@@ -42,10 +46,28 @@ module.exports = async function handler(req, res) {
   if (req.method === 'POST' && action === 'approve') return handleApprove(req, res);
   if (req.method === 'POST' && action === 'reject') return handleReject(req, res);
   if (req.method === 'GET' && action === 'list-looks') return handleListLooks(req, res);
+  if (req.method === 'POST' && action === 'hit') return handleHit(req, res);
   res.status(400).json({ error: 'Неизвестное действие.' });
 };
 
 const SITE_LOOKS_BUCKET = 'site-looks';
+
+/* Ответ всегда 204 и без подробностей: страница ответ не читает (sendBeacon), а сбой
+   счётчика не должен ничего ломать на сайте. */
+async function handleHit(req, res) {
+  if (db.isConfigured()) {
+    try {
+      var body = req.body;
+      if (typeof body === 'string') {
+        try { body = JSON.parse(body); } catch (e) { body = {}; }
+      }
+      await visits.recordHit(body || {}, req.headers && req.headers['user-agent']);
+    } catch (err) {
+      console.error('reviews hit error:', err && err.message);
+    }
+  }
+  res.status(204).end();
+}
 
 function requireDbEnv(res) {
   if (!db.isConfigured()) {

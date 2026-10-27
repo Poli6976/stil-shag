@@ -52,6 +52,7 @@ const { generateCode, sanitizeRef } = require('../lib/partnerCode');
 const db = require('../lib/db');
 const storage = require('../lib/storage');
 const { normalizeEmail } = require('../lib/auth');
+const visits = require('../lib/visits');
 
 const SITE_LOOKS_BUCKET = 'site-looks';
 
@@ -498,6 +499,7 @@ async function handleStats(req, res) {
   var tz = safeTimeZone(req.query && req.query.tz);
 
   try {
+    await visits.ensureTable();
     var results = await Promise.all([
       db.query(
         STATS_PERIODS_SQL +
@@ -513,7 +515,9 @@ async function handleStats(req, res) {
         "  (select count(*) from look_ratings r where r.rating = 'like' and r.created_at >= p.since) as likes, " +
         "  (select count(*) from look_ratings r where r.rating = 'dislike' and r.created_at >= p.since) as dislikes, " +
         '  (select count(*) from discount_credits d where d.created_at >= p.since) as codes_redeemed, ' +
-        "  (select coalesce(sum((o.answers->>'gift')::int), 0)::bigint from orders o where o.package_code = 'GIFT_LOOK' and o.created_at >= p.since) as gifted_looks " +
+        "  (select coalesce(sum((o.answers->>'gift')::int), 0)::bigint from orders o where o.package_code = 'GIFT_LOOK' and o.created_at >= p.since) as gifted_looks, " +
+        '  (select coalesce(sum(v.visits), 0)::bigint from page_views v where v.hour >= p.since) as visits, ' +
+        '  (select coalesce(sum(v.views), 0)::bigint from page_views v where v.hour >= p.since) as views ' +
         'from periods p',
         [tz]
       ),
@@ -536,7 +540,9 @@ async function handleStats(req, res) {
         "  (select coalesce(sum(x.amount_kopecks), 0)::bigint from payments x where x.status = 'succeeded' " +
         "     and x.updated_at >= days.day at time zone $1::text and x.updated_at < (days.day + interval '1 day') at time zone $1::text) as paid_kopecks, " +
         '  (select count(*) from users u ' +
-        "     where u.created_at >= days.day at time zone $1::text and u.created_at < (days.day + interval '1 day') at time zone $1::text) as new_users " +
+        "     where u.created_at >= days.day at time zone $1::text and u.created_at < (days.day + interval '1 day') at time zone $1::text) as new_users, " +
+        '  (select coalesce(sum(v.visits), 0)::bigint from page_views v ' +
+        "     where v.hour >= days.day at time zone $1::text and v.hour < (days.day + interval '1 day') at time zone $1::text) as visits " +
         'from days order by days.day',
         [tz]
       ),
@@ -557,6 +563,20 @@ async function handleStats(req, res) {
       ),
       db.query(
         'select coalesce(sum(looks_in_stock), 0)::bigint as looks, count(*) filter (where looks_in_stock > 0) as holders from wallets'
+      ),
+      db.query(
+        STATS_PERIODS_SQL +
+        'select p.key, v.source, sum(v.visits)::bigint as visits, sum(v.views)::bigint as views ' +
+        'from periods p join page_views v on v.hour >= p.since ' +
+        'group by p.key, v.source',
+        [tz]
+      ),
+      db.query(
+        STATS_PERIODS_SQL +
+        'select p.key, v.path, sum(v.visits)::bigint as visits, sum(v.views)::bigint as views ' +
+        'from periods p join page_views v on v.hour >= p.since ' +
+        'group by p.key, v.path',
+        [tz]
       )
     ]);
 
@@ -567,6 +587,16 @@ async function handleStats(req, res) {
     });
     results[1].rows.forEach(function (row) {
       if (periods[row.key]) periods[row.key].byPackage[row.package_code] = { n: row.n, kopecks: row.kopecks };
+    });
+    Object.keys(periods).forEach(function (key) {
+      periods[key].sources = [];
+      periods[key].pages = [];
+    });
+    results[6].rows.forEach(function (row) {
+      if (periods[row.key]) periods[row.key].sources.push({ source: row.source, visits: row.visits, views: row.views });
+    });
+    results[7].rows.forEach(function (row) {
+      if (periods[row.key]) periods[row.key].pages.push({ path: row.path, visits: row.visits, views: row.views });
     });
 
     res.status(200).json({

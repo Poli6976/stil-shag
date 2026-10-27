@@ -19,7 +19,53 @@
      look_built     — образ собран и показан (js/wizard.js)
      partner_code   — код партнёра принят (js/cabinet.js)
    Точные деньги и заказы — не здесь, а на служебной странице admin-stats.html.
+
+   Отдельно, ВНЕ согласия, — свой счётчик заходов без cookie (низ файла,
+   lib/visits.js): сервер получает только «открыта такая-то страница» и откуда
+   начался визит (тип сайта или метка ?from=… из ссылки). Ничего о человеке не
+   хранится, поэтому согласие не нужно и в счёт попадают все. В браузере на время
+   вкладки (sessionStorage) лежит только начало визита; localStorage stil.noCount
+   = '1' — «не считать мои заходы» (переключатель на admin-stats.html).
    ============================================================================ */
+
+(function () {
+  var VISIT_KEY = 'stil.visit';
+
+  function sendHit() {
+    try { if (localStorage.getItem('stil.noCount') === '1') return; } catch (e) {}
+    if (navigator.webdriver) return;
+
+    var visit = null;
+    try { visit = JSON.parse(sessionStorage.getItem(VISIT_KEY) || 'null'); } catch (e) { visit = null; }
+    var first = !visit;
+    if (first) {
+      var params = new URLSearchParams(window.location.search);
+      var refHost = '';
+      try { refHost = document.referrer ? new URL(document.referrer).hostname : ''; } catch (e) {}
+      visit = {
+        referrer: refHost ? 'https://' + refHost + '/' : '',
+        tag: params.get('from') || params.get('utm_source') || ''
+      };
+      try { sessionStorage.setItem(VISIT_KEY, JSON.stringify(visit)); } catch (e) {}
+    }
+
+    var body = JSON.stringify({
+      path: window.location.pathname,
+      first: first,
+      referrer: visit.referrer || '',
+      tag: visit.tag || ''
+    });
+    var url = 'api/reviews?action=hit';
+    try {
+      if (navigator.sendBeacon && navigator.sendBeacon(url, new Blob([body], { type: 'application/json' }))) return;
+    } catch (e) {}
+    try {
+      fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body, keepalive: true }).catch(function () {});
+    } catch (e) {}
+  }
+
+  sendHit();
+})();
 
 (function () {
   var COUNTER_ID = 113788092; // счётчик «Стиль» в Метрике; 0 — Метрика выключена
