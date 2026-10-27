@@ -19,6 +19,8 @@
        — завести нового партнёра
      POST body {action:'set-partner-status', adminKey, partnerId, status}
        — активировать/деактивировать партнёра (история кодов не удаляется)
+     POST body {action:'set-partner-notes', adminKey, partnerId, notes}
+       — заменить заметку о партнёре (пустая строка — стереть)
      POST body {action:'delete-partner', adminKey, partnerId}
        — удалить партнёра насовсем (partner_codes каскадно удалится вслед за
        ним — on delete cascade в db/schema.sql; уже погашенные покупательницами
@@ -67,6 +69,9 @@ module.exports = async function handler(req, res) {
   }
   if (req.method === 'POST' && action === 'delete-partner') {
     return handleDeletePartner(req, res);
+  }
+  if (req.method === 'POST' && action === 'set-partner-notes') {
+    return handleSetPartnerNotes(req, res);
   }
   if (req.method === 'POST' && action === 'generate-code') {
     return handleGenerateCode(req, res);
@@ -239,6 +244,29 @@ async function handleDeletePartner(req, res) {
   } catch (err) {
     console.error('admin delete-partner error:', err);
     res.status(500).json({ error: 'Не получилось удалить партнёра.' });
+  }
+}
+
+async function handleSetPartnerNotes(req, res) {
+  if (!checkAdminKey(req.body && req.body.adminKey)) {
+    res.status(401).json({ error: 'Неверный админ-ключ.' });
+    return;
+  }
+  if (!requireDbEnv(res)) return;
+
+  var partnerId = req.body && req.body.partnerId;
+  if (!partnerId) {
+    res.status(400).json({ error: 'Не хватает partnerId.' });
+    return;
+  }
+  var notes = String((req.body && req.body.notes) || '').trim().slice(0, 1000) || null;
+
+  try {
+    await db.query('update partners set notes = $1 where id = $2', [notes, partnerId]);
+    res.status(200).json({ ok: true, notes: notes });
+  } catch (err) {
+    console.error('admin set-partner-notes error:', err);
+    res.status(500).json({ error: 'Не получилось сохранить заметку.' });
   }
 }
 

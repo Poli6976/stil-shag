@@ -31,7 +31,14 @@
   .partner-table { width: 100%; border-collapse: collapse; font-family: var(--font-body); font-size: .88rem; }
   .partner-table th, .partner-table td { text-align: left; padding: 12px 10px; border-bottom: 1px solid var(--glow-silver); vertical-align: top; }
   .partner-table th { color: var(--text-muted); font-weight: 500; font-size: .76rem; text-transform: uppercase; letter-spacing: .04em; }
-  .partner-name-contact { color: var(--text-muted); font-size: .82rem; margin-top: 2px; }
+  .partner-name-contact { color: var(--text-muted); font-size: .82rem; margin-top: 2px; word-break: break-all; }
+  .partner-name-contact a { color: var(--accent-gold-ink); }
+  .partner-notes { margin-top: 8px; font-size: .84rem; }
+  .partner-notes__text { white-space: pre-wrap; color: var(--text-primary); background: rgba(255,255,255,.6); border: 1px solid var(--glow-silver); border-radius: 10px; padding: 8px 10px; margin-bottom: 4px; }
+  .partner-notes__toggle { font: inherit; font-size: .8rem; color: var(--accent-gold-ink); background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; margin-right: 10px; }
+  .partner-notes__editor textarea { width: 100%; box-sizing: border-box; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--glow-silver); font-family: var(--font-body); font-size: .85rem; resize: vertical; margin-bottom: 6px; }
+  .partner-notes__save { font: inherit; font-size: .8rem; padding: 6px 14px; border-radius: 999px; border: 1px solid var(--text-primary); background: var(--text-primary); color: #fff; cursor: pointer; margin-right: 10px; }
+  .partner-notes__msg { font-size: .8rem; color: #b23b3b; }
   .partner-status { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: .76rem; white-space: nowrap; }
   .partner-status--active { background: rgba(120,180,120,.18); color: #3b7a3b; }
   .partner-status--inactive { background: rgba(180,120,120,.15); color: #a04a4a; }
@@ -80,7 +87,7 @@
       </div>
       <div class="admin-field">
         <label for="partnerNotes">Заметка</label>
-        <input type="text" id="partnerNotes" placeholder="Необязательно — для себя">
+        <input type="text" id="partnerNotes" placeholder="Необязательно — для себя" autocomplete="off">
       </div>
       <button type="submit" class="btn-3d btn-3d--rect">Добавить партнёра</button>
     </form>
@@ -207,9 +214,20 @@
       if (partner.contact) {
         var contactDiv = document.createElement('div');
         contactDiv.className = 'partner-name-contact';
-        contactDiv.textContent = partner.contact;
+        var href = contactHref(partner.contact);
+        if (href) {
+          var contactLink = document.createElement('a');
+          contactLink.href = href;
+          contactLink.target = '_blank';
+          contactLink.rel = 'noopener noreferrer';
+          contactLink.textContent = partner.contact;
+          contactDiv.appendChild(contactLink);
+        } else {
+          contactDiv.textContent = partner.contact;
+        }
         nameCell.appendChild(contactDiv);
       }
+      nameCell.appendChild(buildNotesBlock(partner));
       row.appendChild(nameCell);
 
       var statusCell = document.createElement('td');
@@ -243,7 +261,9 @@
       countInput.value = '1';
       var noteInput = document.createElement('input');
       noteInput.type = 'text';
-      noteInput.placeholder = 'Заметка';
+      noteInput.placeholder = 'Подпись к кодам';
+      noteInput.title = 'Необязательно. Сохраняется только вместе с кнопкой «Выдать код(ы)». Заметка о самом партнёре — слева, под названием.';
+      noteInput.autocomplete = 'off';
       issueRow.appendChild(countInput);
       issueRow.appendChild(noteInput);
       actionsCell.appendChild(issueRow);
@@ -283,6 +303,110 @@
       row.appendChild(actionsCell);
       partnerTbody.appendChild(row);
     });
+  }
+
+  /* Контакт партнёра → ссылка: только http(s), t.me/vk/max/wa без схемы, @ник Telegram, почта, телефон.
+     Всё остальное остаётся текстом — javascript: и прочие схемы в ссылку не превращаются. */
+  function contactHref(contact) {
+    var s = String(contact || '').trim();
+    if (/^https?:\/\//i.test(s)) {
+      try {
+        var url = new URL(s);
+        return (url.protocol === 'http:' || url.protocol === 'https:') ? url.href : null;
+      } catch (e) {
+        return null;
+      }
+    }
+    if (/^(www\.|t\.me\/|vk\.com\/|vk\.ru\/|max\.ru\/|web\.max\.ru\/|wa\.me\/)\S+$/i.test(s)) return contactHref('https://' + s);
+    if (/^@[A-Za-z0-9_]{4,}$/.test(s)) return 'https://t.me/' + s.slice(1);
+    if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s)) return 'mailto:' + s;
+    if (/^[\d\s()+\-]+$/.test(s)) {
+      var digits = s.replace(/\D/g, '');
+      if (digits.length === 11 && digits.charAt(0) === '8') digits = '7' + digits.slice(1);
+      if (digits.length >= 10 && digits.length <= 12) return 'tel:+' + digits;
+    }
+    return null;
+  }
+
+  /* Заметка о партнёре: видна под названием, «Изменить заметку» открывает поле прямо в строке. */
+  function buildNotesBlock(partner) {
+    var wrap = document.createElement('div');
+    wrap.className = 'partner-notes';
+
+    var text = document.createElement('div');
+    text.className = 'partner-notes__text';
+    var toggle = document.createElement('button');
+    toggle.type = 'button';
+    toggle.className = 'partner-notes__toggle';
+
+    var editor = document.createElement('div');
+    editor.className = 'partner-notes__editor';
+    editor.style.display = 'none';
+    var area = document.createElement('textarea');
+    area.rows = 3;
+    area.maxLength = 1000;
+    area.autocomplete = 'off';
+    area.placeholder = 'Например: написал в Макс 26.10, ждём ответа';
+    var saveBtn = document.createElement('button');
+    saveBtn.type = 'button';
+    saveBtn.className = 'partner-notes__save';
+    saveBtn.textContent = 'Сохранить';
+    var cancelBtn = document.createElement('button');
+    cancelBtn.type = 'button';
+    cancelBtn.className = 'partner-notes__toggle';
+    cancelBtn.textContent = 'Отмена';
+    var msg = document.createElement('span');
+    msg.className = 'partner-notes__msg';
+    editor.appendChild(area);
+    editor.appendChild(saveBtn);
+    editor.appendChild(cancelBtn);
+    editor.appendChild(msg);
+
+    function showText() {
+      text.textContent = partner.notes || '';
+      text.style.display = partner.notes ? 'block' : 'none';
+      toggle.textContent = partner.notes ? '✎ Изменить заметку' : '+ Заметка';
+      toggle.style.display = 'inline';
+      editor.style.display = 'none';
+    }
+
+    toggle.addEventListener('click', function () {
+      area.value = partner.notes || '';
+      msg.textContent = '';
+      text.style.display = 'none';
+      toggle.style.display = 'none';
+      editor.style.display = 'block';
+      area.focus();
+    });
+    cancelBtn.addEventListener('click', showText);
+
+    saveBtn.addEventListener('click', function () {
+      saveBtn.setAttribute('disabled', '');
+      msg.textContent = 'Сохраняю…';
+      fetch('api/admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'set-partner-notes', adminKey: adminKey(), partnerId: partner.partner_id, notes: area.value })
+      })
+        .then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); })
+        .then(function (r) {
+          if (!r.ok) throw new Error(r.data.error || 'Не получилось сохранить заметку.');
+          partner.notes = r.data.notes;
+          showText();
+        })
+        .catch(function (err) {
+          msg.textContent = err.message;
+        })
+        .then(function () {
+          saveBtn.removeAttribute('disabled');
+        });
+    });
+
+    wrap.appendChild(text);
+    wrap.appendChild(toggle);
+    wrap.appendChild(editor);
+    showText();
+    return wrap;
   }
 
   function issueCodes(partner, countValue, note, button, out) {
