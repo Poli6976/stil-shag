@@ -5,6 +5,8 @@
 *.pdf
 *.txt
 !robots.txt
+# Ключ IndexNow (Яндекс, Bing) — должен открываться по прямой ссылке, он не секретный.
+!a290ff11b11984b110a28326616251de.txt
 db/
 scripts/
 .claude/

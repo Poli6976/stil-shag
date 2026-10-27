@@ -4,6 +4,12 @@
     { "path": "/api/files?action=cleanup", "schedule": "0 3 * * *" }
   ],
   "redirects": [
+    {
+      "source": "/((?!api/).*)",
+      "has": [{ "type": "host", "value": "stil-tvoy-shag-po-zhizni.vercel.app" }],
+      "destination": "https://www.stil-shag.ru/$1",
+      "statusCode": 301
+    },
     { "source": "/online-stylist.html", "destination": "/obraz-po-foto.html", "statusCode": 301 },
     { "source": "/online-stylist", "destination": "/obraz-po-foto.html", "statusCode": 301 }
   ]
