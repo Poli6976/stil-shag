@@ -34,7 +34,8 @@
   .partner-name-contact { color: var(--text-muted); font-size: .82rem; margin-top: 2px; word-break: break-all; }
   .partner-name-contact a { color: var(--accent-gold-ink); }
   .partner-notes { margin-top: 8px; font-size: .84rem; }
-  .partner-notes__text { white-space: pre-wrap; color: var(--text-primary); background: rgba(255,255,255,.6); border: 1px solid var(--glow-silver); border-radius: 10px; padding: 8px 10px; margin-bottom: 4px; }
+  .partner-notes__text a { color: var(--accent-gold-ink); word-break: break-all; }
+  .partner-notes__text { white-space: pre-wrap;color: var(--text-primary); background: rgba(255,255,255,.6); border: 1px solid var(--glow-silver); border-radius: 10px; padding: 8px 10px; margin-bottom: 4px; }
   .partner-notes__toggle { font: inherit; font-size: .8rem; color: var(--accent-gold-ink); background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; margin-right: 10px; }
   .partner-notes__editor textarea { width: 100%; box-sizing: border-box; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--glow-silver); font-family: var(--font-body); font-size: .85rem; resize: vertical; margin-bottom: 6px; }
   .partner-notes__save { font: inherit; font-size: .8rem; padding: 6px 14px; border-radius: 999px; border: 1px solid var(--text-primary); background: var(--text-primary); color: #fff; cursor: pointer; margin-right: 10px; }
@@ -328,6 +329,50 @@
     return null;
   }
 
+  /* Ссылки и телефоны внутри заметки → кликабельные. Адрес — только латиница/цифры/знаки
+     (кириллица после ссылки, как в «…/172655331-сообщения», в ссылку не попадает), знаки
+     препинания в конце отрезаются. Телефон открывает чат WhatsApp. Всё через textContent. */
+  var NOTE_LINK_RE = /(https?:\/\/[\x21-\x7E]+|(?:www\.|t\.me\/|vk\.com\/|vk\.ru\/|max\.ru\/|web\.max\.ru\/|wa\.me\/)[\x21-\x7E]+|@[A-Za-z0-9_]{5,}|\+?[78][\s(\-]*\d{3}[\s)\-]*\d{3}[\s\-]*\d{2}[\s\-]*\d{2})/g;
+
+  function renderLinkified(container, value) {
+    container.textContent = '';
+    var last = 0;
+    var match;
+    NOTE_LINK_RE.lastIndex = 0;
+    while ((match = NOTE_LINK_RE.exec(value)) !== null) {
+      var token = match[0];
+      var tail = '';
+      var trimmed = token.match(/^(.*?)([.,;:!?)\-]+)$/);
+      if (trimmed && !/^\+?[78]/.test(token)) {
+        token = trimmed[1];
+        tail = trimmed[2];
+      }
+      var href;
+      if (/^\+?[78][\s(\-]*\d/.test(token)) {
+        var digits = token.replace(/\D/g, '');
+        if (digits.charAt(0) === '8') digits = '7' + digits.slice(1);
+        href = 'https://wa.me/' + digits;
+      } else {
+        href = contactHref(token);
+      }
+      container.appendChild(document.createTextNode(value.slice(last, match.index)));
+      if (href) {
+        var link = document.createElement('a');
+        link.href = href;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        link.textContent = token;
+        if (href.indexOf('https://wa.me/') === 0) link.title = 'Открыть чат в WhatsApp';
+        container.appendChild(link);
+      } else {
+        container.appendChild(document.createTextNode(token));
+      }
+      container.appendChild(document.createTextNode(tail));
+      last = match.index + match[0].length;
+    }
+    container.appendChild(document.createTextNode(value.slice(last)));
+  }
+
   /* Заметка о партнёре: видна под названием, «Изменить заметку» открывает поле прямо в строке. */
   function buildNotesBlock(partner) {
     var wrap = document.createElement('div');
@@ -363,7 +408,7 @@
     editor.appendChild(msg);
 
     function showText() {
-      text.textContent = partner.notes || '';
+      renderLinkified(text, partner.notes || '');
       text.style.display = partner.notes ? 'block' : 'none';
       toggle.textContent = partner.notes ? '✎ Изменить заметку' : '+ Заметка';
       toggle.style.display = 'inline';
