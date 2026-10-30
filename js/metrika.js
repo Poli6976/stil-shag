@@ -3,7 +3,10 @@
    Подключается на всех страницах для покупательниц (не на admin-*.html).
 
    Метрика ставит cookie, а это обработка персональных данных (152-ФЗ), поэтому
-   счётчик загружается ТОЛЬКО после согласия посетителя в плашке внизу экрана.
+   счётчик загружается ТОЛЬКО после «Хорошо» в полоске внизу экрана. Полоска —
+   короткая, как на большинстве сайтов (30.10.2026: большая плашка с пояснениями
+   на телефоне закрывала пол-экрана, и люди уходили с сайта). Не нажали — Метрика
+   не грузится, сайт работает как обычно.
    Выбор хранится в браузере (localStorage, ключ stil.analyticsConsent:
    'yes' / 'no'); изменить его можно на странице legal-privacy.html, п. 7
    (кнопка вызывает window.stilAnalyticsConsentReset).
@@ -123,13 +126,14 @@
     var style = document.createElement('style');
     style.id = 'stilConsentStyles';
     style.textContent =
-      '.stil-consent{position:fixed;left:16px;right:16px;bottom:16px;z-index:9999;max-width:560px;margin:0 auto;' +
-      'padding:16px 18px;border-radius:16px;background:rgba(20,17,44,.96);color:#f4f2fb;' +
-      'box-shadow:0 10px 30px rgba(0,0,0,.35);font-family:"Montserrat","Segoe UI",sans-serif;font-size:.85rem;line-height:1.5}' +
+      '.stil-consent{position:fixed;left:12px;right:12px;bottom:12px;z-index:9999;max-width:420px;margin:0 auto;' +
+      'display:flex;align-items:center;gap:12px;padding:8px 8px 8px 16px;border-radius:999px;' +
+      'background:rgba(20,17,44,.92);color:#f4f2fb;box-shadow:0 6px 20px rgba(0,0,0,.25);' +
+      'font-family:"Montserrat","Segoe UI",sans-serif;font-size:.78rem;line-height:1.3}' +
+      '.stil-consent__text{flex:1}' +
       '.stil-consent a{color:#f0cc7d}' +
-      '.stil-consent__actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}' +
-      '.stil-consent__btn{font:inherit;font-size:.82rem;padding:9px 16px;border-radius:999px;cursor:pointer;border:1px solid rgba(195,203,230,.5);background:transparent;color:#f4f2fb}' +
-      '.stil-consent__btn--yes{background:#e3bd67;border-color:#e3bd67;color:#201a3d;font-weight:600}';
+      '.stil-consent__btn{font:inherit;font-size:.78rem;font-weight:600;padding:7px 16px;border-radius:999px;cursor:pointer;' +
+      'border:0;background:#e3bd67;color:#201a3d;white-space:nowrap}';
     document.head.appendChild(style);
   }
 
@@ -139,42 +143,28 @@
     var box = document.createElement('div');
     box.className = 'stil-consent';
     box.id = 'stilConsent';
-    box.setAttribute('role', 'dialog');
-    box.setAttribute('aria-label', 'Статистика посещений');
+    box.setAttribute('role', 'region');
+    box.setAttribute('aria-label', 'Cookie');
 
     var text = document.createElement('div');
-    text.appendChild(document.createTextNode(
-      'Разрешите нам считать посещения сайта через Яндекс.Метрику — так мы поймём, что сделать удобнее. ' +
-      'Метрика использует cookie; фото и ответы анкеты она не получает. '
-    ));
+    text.className = 'stil-consent__text';
     var link = document.createElement('a');
     link.href = 'legal-privacy.html#analytics';
-    link.textContent = 'Подробнее';
+    link.textContent = 'cookie';
+    text.appendChild(document.createTextNode('Сайт использует '));
     text.appendChild(link);
     box.appendChild(text);
 
-    var actions = document.createElement('div');
-    actions.className = 'stil-consent__actions';
     var yes = document.createElement('button');
     yes.type = 'button';
-    yes.className = 'stil-consent__btn stil-consent__btn--yes';
-    yes.textContent = 'Разрешить';
-    var no = document.createElement('button');
-    no.type = 'button';
-    no.className = 'stil-consent__btn';
-    no.textContent = 'Не надо';
-    actions.appendChild(yes);
-    actions.appendChild(no);
-    box.appendChild(actions);
+    yes.className = 'stil-consent__btn';
+    yes.textContent = 'Хорошо';
+    box.appendChild(yes);
 
     yes.addEventListener('click', function () {
       writeConsent('yes');
       box.remove();
       loadMetrika();
-    });
-    no.addEventListener('click', function () {
-      writeConsent('no');
-      box.remove();
     });
 
     document.body.appendChild(box);
