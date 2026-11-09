@@ -1,0 +1,182 @@
+/* ============ Блог: список статей и страница статьи ============
+   Надстройка над inner.css — те же токены, шрифты и золотой акцент. */
+
+/* ---------- список статей ---------- */
+.blog-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 24px;
+}
+
+.blog-card {
+  display: block;
+  border-radius: 18px;
+  overflow: hidden;
+  text-decoration: none;
+  color: inherit;
+  background: rgba(255, 255, 255, 0.4);
+  border: 1px solid var(--glow-silver);
+  transition: transform 0.25s ease, border-color 0.25s ease;
+}
+
+:root[data-theme="light"] .blog-card {
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.blog-card:hover,
+.blog-card:focus-visible {
+  transform: translateY(-3px);
+  border-color: var(--accent-gold);
+}
+
+.blog-card img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  object-position: top;
+}
+
+.blog-card__body {
+  padding: 20px 22px 24px;
+}
+
+.blog-card__meta {
+  font-family: var(--font-body);
+  font-size: var(--fs-small);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--accent-gold-ink);
+  margin-bottom: 10px;
+}
+
+.blog-card h2 {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 1.5rem;
+  line-height: 1.25;
+  color: var(--text-primary);
+  margin-bottom: 10px;
+}
+
+.blog-card p {
+  font-family: var(--font-body);
+  font-weight: 400;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+
+/* ---------- статья ---------- */
+.article {
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.article__meta {
+  font-family: var(--font-body);
+  font-size: var(--fs-small);
+  color: var(--text-muted);
+  text-align: center;
+  margin-bottom: 40px;
+}
+
+.article h2 {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(1.5rem, 3vw, 2rem);
+  line-height: 1.25;
+  color: var(--text-primary);
+  margin: 2.4em 0 0.7em;
+}
+
+.article h3 {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 1.3rem;
+  color: var(--text-primary);
+  margin: 1.8em 0 0.4em;
+}
+
+.article p,
+.article li {
+  font-family: var(--font-body);
+  font-weight: 400;
+  font-size: 1.02rem;
+  line-height: 1.8;
+  color: var(--text-primary);
+}
+
+.article p {
+  margin: 0 0 1.1em;
+}
+
+.article ul {
+  margin: 0 0 1.1em;
+  padding-left: 1.2em;
+}
+
+.article li {
+  margin-bottom: 0.4em;
+}
+
+.article a {
+  color: var(--accent-gold-ink);
+}
+
+.article__lead {
+  font-size: 1.15rem;
+  line-height: 1.75;
+  color: var(--text-muted);
+}
+
+.article figure {
+  margin: 2em auto;
+  max-width: 420px;
+}
+
+.article figure img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 18px;
+  border: 1px solid var(--glow-silver);
+}
+
+.article figcaption {
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+  margin-top: 10px;
+  text-align: center;
+}
+
+.article__cta {
+  margin: 3em 0 1em;
+  padding: 28px 24px;
+  text-align: center;
+  border-radius: 18px;
+  border: 1px solid var(--glow-silver);
+  background: rgba(255, 255, 255, 0.4);
+}
+
+:root[data-theme="light"] .article__cta {
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.article__cta h2 {
+  margin-top: 0;
+}
+
+.article__back {
+  text-align: center;
+  margin-top: 2em;
+}
+
+@media (max-width: 600px) {
+  .article p,
+  .article li {
+    font-size: 1rem;
+  }
+}
