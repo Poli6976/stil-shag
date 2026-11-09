@@ -32,6 +32,7 @@
 .blog-card img {
   display: block;
   width: 100%;
+  height: auto;
   aspect-ratio: 4 / 3;
   object-fit: cover;
   object-position: top;
@@ -179,4 +180,15 @@
   .article li {
     font-size: 1rem;
   }
+}
+
+/* ---------- «Читайте также» ---------- */
+.article__related {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 1.5em;
+}
+
+.article__related li {
+  margin-bottom: 0.7em;
 }
