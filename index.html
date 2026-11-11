@@ -43,7 +43,7 @@
 <link rel="stylesheet" href="css/tokens.css?v=7">
 <link rel="stylesheet" href="css/base.css?v=2">
 <link rel="stylesheet" href="css/components/button-3d.css?v=3">
-<link rel="stylesheet" href="css/home.css?v=8">
+<link rel="stylesheet" href="css/home.css?v=9">
 </head>
 <body>
 
@@ -229,6 +229,12 @@
     <img class="fig-silhouette fig-silhouette--2" src="assets/silhouette/fig-2.png" alt="">
     <img class="fig-silhouette fig-silhouette--3" src="assets/silhouette/fig-3.png" alt="">
     <img class="fig-silhouette fig-silhouette--4" src="assets/silhouette/fig-4.png" alt="">
+    <!-- живые модели: появляются поверх силуэтов по очереди при движении мыши
+         (на телефоне — когда главная открылась); логика в js/banner.js -->
+    <video class="fig-live" data-fig="1" src="assets/banner/model-1.mp4" muted playsinline preload="auto"></video>
+    <video class="fig-live" data-fig="2" src="assets/banner/model-2.mp4" muted playsinline preload="auto"></video>
+    <video class="fig-live" data-fig="3" src="assets/banner/model-3.mp4" muted playsinline preload="auto"></video>
+    <video class="fig-live" data-fig="4" src="assets/banner/model-4.mp4" muted playsinline preload="auto"></video>
   </div>
 
   <!-- ================= ШАПКА ================= -->
@@ -284,6 +290,7 @@
 
 <script src="js/starfield.js"></script>
 <script src="js/main.js"></script>
+<script src="js/banner.js?v=1"></script>
 <script src="js/metrika.js?v=3"></script>
 </body>
 </html>

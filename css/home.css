@@ -104,6 +104,31 @@ html, body {
   height: 46vh;
 }
 
+/* ---------- живые модели поверх силуэтов ----------
+   Видео ставится JS-ом точно на место своего силуэта (js/banner.js).
+   Края кадра растушёваны маской, чтобы не было видно прямоугольника. */
+.fig-silhouette {
+  transition: opacity 0.6s ease;
+}
+
+.fig-silhouette.is-hidden {
+  opacity: 0 !important;
+}
+
+.fig-live {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+  object-fit: cover;
+  transition: opacity 0.6s ease;
+  -webkit-mask-image: radial-gradient(ellipse 30% 50% at 50% 52%, #000 55%, transparent 100%);
+  mask-image: radial-gradient(ellipse 30% 50% at 50% 52%, #000 55%, transparent 100%);
+}
+
+.fig-live.is-live {
+  opacity: 1;
+}
+
 /* ---------- шапка ---------- */
 .site-header {
   position: fixed;

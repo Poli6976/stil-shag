@@ -5,3 +5,6 @@ node_modules/
 .env.migrate
 .vercel
 *.log
+
+# сырьё для Kling (кадры и исходные ролики)
+_kling/
