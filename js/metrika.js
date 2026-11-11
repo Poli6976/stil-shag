@@ -126,14 +126,16 @@
     var style = document.createElement('style');
     style.id = 'stilConsentStyles';
     style.textContent =
-      '.stil-consent{position:fixed;left:12px;right:12px;bottom:12px;z-index:9999;max-width:420px;margin:0 auto;' +
-      'display:flex;align-items:center;gap:12px;padding:8px 8px 8px 16px;border-radius:999px;' +
+      '.stil-consent{position:fixed;left:12px;bottom:12px;z-index:9999;width:fit-content;max-width:calc(100vw - 24px);margin:0;' +
+      'display:flex;align-items:center;gap:8px;padding:6px 6px 6px 14px;border-radius:999px;' +
       'background:rgba(20,17,44,.92);color:#f4f2fb;box-shadow:0 6px 20px rgba(0,0,0,.25);' +
       'font-family:"Montserrat","Segoe UI",sans-serif;font-size:.78rem;line-height:1.3}' +
       '.stil-consent__text{flex:1}' +
       '.stil-consent a{color:#f0cc7d}' +
-      '.stil-consent__btn{font:inherit;font-size:.78rem;font-weight:600;padding:7px 16px;border-radius:999px;cursor:pointer;' +
-      'border:0;background:#e3bd67;color:#201a3d;white-space:nowrap}';
+      '.stil-consent__btn{font:inherit;font-size:.78rem;font-weight:600;padding:6px 12px;border-radius:999px;cursor:pointer;' +
+      'border:0;background:#e3bd67;color:#201a3d;white-space:nowrap}' +
+      /* на телефоне внизу — ссылки подвала на всю ширину: плашка стоит над ними, а не поверх */
+      '@media (max-width:767px){.stil-consent{bottom:72px}}';
     document.head.appendChild(style);
   }
 
