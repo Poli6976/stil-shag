@@ -89,6 +89,26 @@ main {
   padding: clamp(64px, 10vw, 120px) clamp(20px, 5vw, 48px) clamp(80px, 10vw, 140px);
 }
 
+/* Невысокий экран (ноутбук): плавающая кнопка внизу экрана закрывала конец абзаца
+   под заголовком — сдвигаем содержимое вверх, на высоких экранах ничего не меняется. */
+@media (min-width: 901px) and (max-height: 800px) {
+  main {
+    padding-top: 40px;
+  }
+
+  .page-hero {
+    margin-bottom: 48px;
+  }
+
+  .page-hero h1 {
+    margin-bottom: 16px;
+  }
+
+  .page-hero__lead {
+    margin-bottom: 20px;
+  }
+}
+
 /* ---------- hero ---------- */
 .page-hero {
   text-align: center;

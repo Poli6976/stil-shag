@@ -218,13 +218,15 @@ html, body {
   font-weight: 300;
   font-size: clamp(0.95rem, 2.2vw, 1.25rem);
   letter-spacing: 0.01em;
-  color: var(--text-muted);
+  color: #e4e0f4;
+  /* мягкая тень: текст читается и на тёмном небе, и там, где оно переходит в закат */
+  text-shadow: 0 1px 14px rgba(24, 12, 48, 0.6);
   max-width: 34ch;
 }
 
 .hero-subtitle--explain {
   font-size: clamp(0.85rem, 1.8vw, 1.05rem);
-  opacity: 0.8;
+  opacity: 0.94;
   max-width: 38ch;
 }
 
@@ -279,15 +281,17 @@ html, body {
   font-size: 0.72rem;
   letter-spacing: var(--tracking-wide);
   text-transform: uppercase;
-  color: var(--text-muted);
+  /* низ сцены светлый (закат), светло-серые ссылки на нём сливались с фоном — тёмные чернила */
+  color: #2c1d0e;
+  font-weight: 500;
   text-decoration: none;
   border-bottom: 1px solid transparent;
   transition: color 0.2s ease, border-color 0.2s ease;
 }
 
 .final-cta__secondary:hover {
-  color: var(--accent-gold);
-  border-color: var(--glow-gold);
+  color: #fff7e0;
+  border-color: rgba(255, 247, 224, 0.7);
 }
 
 @keyframes cta-in {
@@ -323,13 +327,31 @@ html, body {
   font-size: 0.66rem;
   letter-spacing: var(--tracking-wide);
   text-transform: uppercase;
-  color: var(--text-faint);
+  /* низ сцены светлый (закат): тёмные чернила вместо блёклого лилового */
+  color: #2c1d0e;
+  font-weight: 500;
   text-decoration: none;
   transition: color 0.2s ease;
 }
 
 .home-footer a:hover {
-  color: var(--accent-gold);
+  color: #fff7e0;
+}
+
+/* Невысокий экран (ноутбук): заголовок и абзацы стояли вплотную к кнопке, конец второго
+   абзаца уходил под неё — чуть выше блок и чуть меньше заголовок. Высокие экраны не меняются. */
+@media (min-width: 768px) and (max-height: 780px) {
+  .hero-heading {
+    top: 36%;
+  }
+
+  .reveal-text__inner {
+    font-size: min(9vw, 8.5rem, 16vh);
+  }
+
+  .final-cta {
+    bottom: 10%;
+  }
 }
 
 /* ---------- доступность: уважение reduced motion ---------- */
