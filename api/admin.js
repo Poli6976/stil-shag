@@ -506,16 +506,17 @@ async function handleStats(req, res) {
         'select p.key, ' +
         '  (select count(*) from users u where u.created_at >= p.since) as new_users, ' +
         '  (select count(*) from users u where u.last_login_at >= p.since) as active_users, ' +
-        "  (select count(*) from payments x where x.status = 'succeeded' and x.updated_at >= p.since) as paid_count, " +
-        "  (select coalesce(sum(x.amount_kopecks), 0)::bigint from payments x where x.status = 'succeeded' and x.updated_at >= p.since) as paid_kopecks, " +
-        "  (select count(distinct x.user_id) from payments x where x.status = 'succeeded' and x.updated_at >= p.since) as payers, " +
+        "  (select count(*) from payments x where x.status = 'succeeded' and x.provider <> 'manual_test' and x.updated_at >= p.since) as paid_count, " +
+        "  (select coalesce(sum(x.amount_kopecks), 0)::bigint from payments x where x.status = 'succeeded' and x.provider <> 'manual_test' and x.updated_at >= p.since) as paid_kopecks, " +
+        "  (select count(distinct x.user_id) from payments x where x.status = 'succeeded' and x.provider <> 'manual_test' and x.updated_at >= p.since) as payers, " +
         "  (select count(*) from payments x where x.status in ('pending', 'failed', 'canceled') and x.created_at >= p.since) as unpaid_count, " +
         "  (select count(*) from orders o where o.look_id is not null and o.done_at >= p.since) as looks_built, " +
         '  (select count(*) from orders o where o.rebuild_used and o.done_at >= p.since) as rebuilds, ' +
         "  (select count(*) from look_ratings r where r.rating = 'like' and r.created_at >= p.since) as likes, " +
         "  (select count(*) from look_ratings r where r.rating = 'dislike' and r.created_at >= p.since) as dislikes, " +
         '  (select count(*) from discount_credits d where d.created_at >= p.since) as codes_redeemed, ' +
-        "  (select coalesce(sum((o.answers->>'gift')::int), 0)::bigint from orders o where o.package_code = 'GIFT_LOOK' and o.created_at >= p.since) as gifted_looks, " +
+        "  (select coalesce(sum((o.answers->>'gift')::int), 0)::bigint from orders o where o.package_code = 'GIFT_LOOK' and o.created_at >= p.since " +
+        "     and o.user_id not in (select id from users where email = 'pan_6565@list.ru')) as gifted_looks, " + /* тестовый аккаунт: подарки ему — рабочий запас, не считаем */
         '  (select coalesce(sum(v.visits), 0)::bigint from page_views v where v.hour >= p.since) as visits, ' +
         '  (select coalesce(sum(v.views), 0)::bigint from page_views v where v.hour >= p.since) as views ' +
         'from periods p',
@@ -524,7 +525,7 @@ async function handleStats(req, res) {
       db.query(
         STATS_PERIODS_SQL +
         'select p.key, o.package_code, count(*) as n, coalesce(sum(x.amount_kopecks), 0)::bigint as kopecks ' +
-        "from periods p join payments x on x.status = 'succeeded' and x.updated_at >= p.since " +
+        "from periods p join payments x on x.status = 'succeeded' and x.provider <> 'manual_test' and x.updated_at >= p.since " +
         'join orders o on o.id = x.order_id ' +
         'group by p.key, o.package_code',
         [tz]
@@ -535,9 +536,9 @@ async function handleStats(req, res) {
         "    date_trunc('day', now() at time zone $1::text), interval '1 day') d" +
         ') ' +
         "select to_char(days.day, 'YYYY-MM-DD') as day, " +
-        "  (select count(*) from payments x where x.status = 'succeeded' " +
+        "  (select count(*) from payments x where x.status = 'succeeded' and x.provider <> 'manual_test' " +
         "     and x.updated_at >= days.day at time zone $1::text and x.updated_at < (days.day + interval '1 day') at time zone $1::text) as paid_count, " +
-        "  (select coalesce(sum(x.amount_kopecks), 0)::bigint from payments x where x.status = 'succeeded' " +
+        "  (select coalesce(sum(x.amount_kopecks), 0)::bigint from payments x where x.status = 'succeeded' and x.provider <> 'manual_test' " +
         "     and x.updated_at >= days.day at time zone $1::text and x.updated_at < (days.day + interval '1 day') at time zone $1::text) as paid_kopecks, " +
         '  (select count(*) from users u ' +
         "     where u.created_at >= days.day at time zone $1::text and u.created_at < (days.day + interval '1 day') at time zone $1::text) as new_users, " +
@@ -558,7 +559,7 @@ async function handleStats(req, res) {
         'left join discount_credits dc on dc.order_id = o.id ' +
         'left join partner_codes pc on pc.code = dc.code ' +
         'left join partners pt on pt.id = pc.partner_id ' +
-        "where x.status = 'succeeded' " +
+        "where x.status = 'succeeded' and x.provider <> 'manual_test' " +
         'order by x.updated_at desc limit 30'
       ),
       db.query(
