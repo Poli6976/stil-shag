@@ -23,7 +23,7 @@
     1: { top: 0.14, feet: 0.85 },
     2: { top: 0.09, feet: 0.90 },
     3: { top: 0.22, feet: 0.84 },
-    4: { top: 0.21, feet: 0.80 }
+    4: { top: 0.09, feet: 0.92, cx: 0.66 }
   };
   var VIDEO_RATIO = 9 / 16;     // ширина / высота ролика
   var STEP_DELAY = 1200;        // пауза между стартами моделей, мс
@@ -47,7 +47,7 @@
       var img = document.querySelector('.fig-silhouette--' + n);
       if (!img || !FRAME[n]) continue;
       if (endMode === 'back') {
-        video.src = 'assets/banner/model-' + n + '-back.mp4';
+        video.src = 'assets/banner/model-' + n + '-back.mp4?v=2';
       }
       video.muted = true;
       slots.push({ n: n, video: video, img: img });
@@ -84,7 +84,8 @@
       var h = r.height / (f.feet - f.top);
       var w = h * VIDEO_RATIO;
       var top = r.bottom - f.feet * h;
-      var left = r.left + r.width / 2 - w / 2;
+      // cx — где по горизонтали в кадре стоит модель (0.5 — по центру)
+      var left = r.left + r.width / 2 - w * (f.cx || 0.5);
       s.video.style.display = '';
       s.video.style.width = w + 'px';
       s.video.style.height = h + 'px';
