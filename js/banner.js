@@ -86,6 +86,10 @@
       var top = r.bottom - f.feet * h;
       // cx — где по горизонтали в кадре стоит модель (0.5 — по центру)
       var left = r.left + r.width / 2 - w * (f.cx || 0.5);
+      // в узком окне компьютера (около 768–1000 px) кадр уходил за край экрана и
+      // модель обрезалась — прижимаем кадр к экрану. На телефоне (до 767 px) не трогаем.
+      var vw = window.innerWidth;
+      if (vw >= 768 && w < vw) left = Math.min(Math.max(left, 0), vw - w);
       s.video.style.display = '';
       s.video.style.width = w + 'px';
       s.video.style.height = h + 'px';

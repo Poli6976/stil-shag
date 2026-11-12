@@ -43,7 +43,7 @@
 <link rel="stylesheet" href="css/tokens.css?v=7">
 <link rel="stylesheet" href="css/base.css?v=2">
 <link rel="stylesheet" href="css/components/button-3d.css?v=3">
-<link rel="stylesheet" href="css/home.css?v=11">
+<link rel="stylesheet" href="css/home.css?v=12">
 </head>
 <body>
 
@@ -267,6 +267,7 @@
   <div class="final-cta">
     <a href="how-it-works.html" class="btn-3d btn-3d--rect">Как это работает</a>
     <a href="structure.html" class="final-cta__secondary">Структура сайта</a>
+    <a href="#about" class="final-cta__more" aria-label="Подробнее о сервисе — прокрутите вниз">Подробнее о сервисе ↓</a>
   </div>
 
   <!-- ================= МИНИМАЛЬНЫЙ ФУТЕР: путь на остальной сайт и юр.документы ================= -->
@@ -288,9 +289,63 @@
 
 </div>
 
+<div class="home-spacer" aria-hidden="true"></div>
+
+<!-- ================= ТЕКСТ ПОД ЭКРАНОМ: для читателей и поисковиков ================= -->
+<main class="home-about" id="about">
+  <div class="home-about__inner">
+
+    <h2>Что такое «Стиль»</h2>
+    <p>«Стиль» — онлайн-стилист. Вы загружаете фото вещи, которая уже есть в вашем шкафу, а сервис собирает вокруг неё полный образ: что надеть сверху и снизу, какую обувь и аксессуары выбрать — под ваш стиль, фигуру и повод.</p>
+
+    <h2>Как это работает</h2>
+    <ol class="home-about__steps">
+      <li><strong>Загрузите фото вещи</strong> — той, с которой не знаете, что носить.</li>
+      <li><strong>Ответьте на несколько вопросов</strong> — про повод, сезон, стиль и ваши параметры.</li>
+      <li><strong>Получите образ</strong> — по слоям, с иллюстрацией-референсом. Он сохранится в личном кабинете.</li>
+    </ol>
+
+    <h2>Кому это подойдёт</h2>
+    <p>Тем, у кого в шкафу есть вещи, а образов из них не складывается. Тем, кто не любит долгие походы по магазинам. И тем, кто хочет понять, что к вещи действительно нужно докупить, а что нет.</p>
+
+    <div class="home-about__cta">
+      <a href="obraz-po-foto.html" class="btn-3d btn-3d--rect">Собрать образ к моей вещи</a>
+      <a href="how-it-works.html" class="home-about__link">Подробнее, как это работает →</a>
+    </div>
+
+    <h2>Из блога</h2>
+    <ul class="home-about__posts">
+      <li><a href="blog/s-chem-nosit-bezhevyj-trench.html">С чем носить бежевый тренч: 6 готовых образов</a></li>
+      <li><a href="blog/s-chem-nosit-dzhinsovuyu-kurtku.html">С чем носить джинсовую куртку: 6 образов на каждый день</a></li>
+      <li><a href="blog/s-chem-nosit-plisirovannuyu-yubku.html">С чем носить плиссированную юбку: 6 образов и 3 правила</a></li>
+    </ul>
+    <p class="home-about__all"><a href="blog.html">Все статьи блога →</a></p>
+
+  </div>
+
+  <footer class="home-about__footer">
+    <nav aria-label="Разделы сайта">
+      <a href="how-it-works.html">Как это работает</a>
+      <a href="obraz-po-foto.html">Образ по фото</a>
+      <a href="primerka.html">Примерка</a>
+      <a href="prices.html">Цены</a>
+      <a href="blog.html">Блог</a>
+      <a href="faq.html">FAQ</a>
+      <a href="about.html">О проекте</a>
+      <a href="https://t.me/stil_tvoy_shag" target="_blank" rel="noopener">Telegram</a>
+    </nav>
+    <nav aria-label="Юридические документы">
+      <a href="legal-agreement.html">Соглашение</a>
+      <a href="legal-privacy.html">Конфиденциальность</a>
+      <a href="legal-offer.html">Оферта</a>
+      <a href="legal-partners.html">Партнёрам</a>
+    </nav>
+  </footer>
+</main>
+
 <script src="js/starfield.js"></script>
 <script src="js/main.js"></script>
-<script src="js/banner.js?v=3"></script>
+<script src="js/banner.js?v=4"></script>
 <script src="js/metrika.js?v=6"></script>
 </body>
 </html>
