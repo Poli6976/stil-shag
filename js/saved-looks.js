@@ -48,7 +48,7 @@
     var lines = displayLayers(look.layers || {}, TELEGRAM_LAYER_LABELS)
       .map(function (pair) { return pair[0] + ': ' + pair[1]; });
     return 'Новый образ 👇\n' + lines.join('\n') +
-      '\n\nОбраз по фото — 590 ₽, 3 образа — 1 200 ₽ → https://stil-shag.ru/obraz-po-foto.html';
+      '\n\nОбраз по фото — 590 ₽, 3 образа — 1 200 ₽ → https://www.stil-shag.ru/obraz-po-foto.html';
   }
 
   function copyToClipboard(text) {
