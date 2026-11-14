@@ -1303,7 +1303,35 @@
     return out;
   }
 
+  /* Анкету показываем сразу, без входа (2026-11-15): почту просим в конце, перед сборкой образа.
+     gateHandle — форма входа из js/auth-gate.js; awaitingLogin — человек сейчас вводит почту/код,
+     после входа сразу продолжаем сборку. */
+  var gateHandle = null;
+  var awaitingLogin = false;
+  var guestStarted = false;
+
+  function promptLogin() {
+    awaitingLogin = true;
+    root.innerHTML = '';
+    var mount = el('div', 'wizard-login');
+    var backBtn = el('button', 'wizard-back', '← Назад');
+    backBtn.type = 'button';
+    backBtn.addEventListener('click', function () {
+      awaitingLogin = false;
+      stepIndex = visibleSteps().length - 1;
+      render();
+    });
+    root.appendChild(mount);
+    root.appendChild(backBtn);
+    if (gateHandle) {
+      gateHandle.showForm(mount, 'Анкета готова. Введите почту — пришлём код для входа, и сразу соберём ваш образ.');
+    } else {
+      mount.appendChild(el('p', 'wizard-photo-status wizard-photo-status--error', 'Вход пока не настроен на сервере.'));
+    }
+  }
+
   function submitLook() {
+    if (!currentSession) { promptLogin(); return; }
     if (rebuild) { chargeAndRenderResult({ rebuildOf: rebuild.orderId }); return; }
     if (purchase && purchase.stock > 0) { chargeAndRenderResult({}); return; }
     var unconfirmed = readUnconfirmed();
@@ -2243,10 +2271,18 @@
   }
 
   if (authGate && window.stilAuthGate) {
-    window.stilAuthGate.renderGate(authGate, function (session) {
+    var progressWrapEl = document.getElementById('wizardProgressWrap');
+    gateHandle = window.stilAuthGate.renderGate(authGate, function (session) {
       currentSession = session;
-      var progressWrap = document.getElementById('wizardProgressWrap');
-      if (progressWrap) progressWrap.style.display = '';
+      if (progressWrapEl) progressWrapEl.style.display = '';
+      /* Человек уже проходит анкету без входа: профиль и «вернулись с оплаты» не трогаем,
+         экран не перерисовываем — только если он ждал входа, продолжаем сборку. */
+      if (guestStarted) {
+        loadPurchase().then(function () {
+          if (awaitingLogin) { awaitingLogin = false; submitLook(); }
+        });
+        return;
+      }
       var profileReady = SP
         ? SP.getProfile(session).then(function (data) { profile = (data && data.profile) || null; }).catch(function () { profile = null; })
         : Promise.resolve();
@@ -2258,6 +2294,13 @@
         if (stepIndex === 0) applyProfileAnswers();
         render();
       });
+    }, {
+      deferForm: true,
+      onGuest: function () {
+        guestStarted = true;
+        if (progressWrapEl) progressWrapEl.style.display = '';
+        render();
+      }
     });
   } else {
     render();

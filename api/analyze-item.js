@@ -76,10 +76,15 @@ module.exports = async function handler(req, res) {
     return;
   }
 
+  /* С 2026-11-15 анкета открыта без входа (почту просят в конце), поэтому фото разбираем и без входа —
+     но для таких запросов отдельный, более жёсткий лимит по IP: вызов GigaChat стоит денег. */
   var user = await requireUser(req);
   if (!user) {
-    res.status(401).json({ error: 'Нужно войти по email.' });
-    return;
+    var guestAllowed = await checkRateLimit(req, 'analyze-item-guest', { windowSeconds: 3600, maxHits: 6 });
+    if (!guestAllowed) {
+      res.status(429).json({ error: 'Слишком много запросов. Попробуйте позже или опишите вещь текстом.' });
+      return;
+    }
   }
 
   var allowed = await checkRateLimit(req, 'analyze-item', { windowSeconds: 600, maxHits: 5 });

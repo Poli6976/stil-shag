@@ -26,8 +26,13 @@
      входе и повторно НЕ вызывается при последующих сменах сессии на этой же
      загрузке страницы — вызывающий код сам решает, что делать (обычно просто
      один раз инициализирует форму/визард). */
-  function renderGate(mountEl, onReady) {
+  /* opts (необязательно): { deferForm: true, onGuest: fn } — если человек не вошёл, форму сразу НЕ рисуем,
+     а вызываем onGuest(); форму покажет вызывающий код позже через handle.showForm(target, lead)
+     (анкета «Образ по фото»: почту просят только в конце, перед сборкой образа). */
+  function renderGate(mountEl, onReady, opts) {
+    opts = opts || {};
     var readyFired = false;
+    var handle = { showForm: function () {} };
 
     getClient().then(function (client) {
       if (!client) {
@@ -50,12 +55,13 @@
          по ссылкам во входящих ДО того, как их откроет человек, и одноразовый токен
          сгорает раньше реального клика. Код, который просто набирают руками, для
          сканера не существует — ссылок в письме нет, сканировать нечего. */
-      function showForm() {
-        mountEl.innerHTML = '';
+      function showForm(target, lead) {
+        target = target || mountEl;
+        target.innerHTML = '';
 
         var box = el('div', 'auth-gate');
         box.appendChild(el('p', 'auth-gate__lead',
-          'Войдите по email, чтобы мы могли оформить и засчитать ваш образ — пришлём код для входа.'));
+          lead || 'Войдите по email, чтобы мы могли оформить и засчитать ваш образ — пришлём код для входа.'));
 
         var form = document.createElement('form');
         form.className = 'auth-gate__form';
@@ -75,7 +81,7 @@
         form.appendChild(btn);
         box.appendChild(form);
         box.appendChild(msg);
-        mountEl.appendChild(box);
+        target.appendChild(box);
 
         function showCodeForm(email) {
           msg.textContent = 'Мы отправили код на ' + email + ' — введите его ниже.';
@@ -142,15 +148,20 @@
         });
       }
 
+      handle.showForm = showForm;
+
       client.auth.getSession().then(function (r) {
         var session = r.data && r.data.session;
-        if (session) { fireReady(session); } else { showForm(); }
+        if (session) { fireReady(session); }
+        else if (opts.deferForm) { if (opts.onGuest) opts.onGuest(); }
+        else { showForm(); }
       });
 
       client.auth.onAuthStateChange(function (_event, session) {
         if (session) fireReady(session);
       });
     });
+    return handle;
   }
 
   window.stilAuthGate = { renderGate: renderGate };
