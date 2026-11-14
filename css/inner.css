@@ -1164,6 +1164,12 @@ body:has(.page-cta) {
 @media (max-width: 600px) {
   .hero-gets li { flex-basis: 140px; }
 }
+.hero-cta {
+  margin: 18px 0 6px;
+}
+#wizardAuthGate {
+  scroll-margin-top: 24px;
+}
 .hero-price {
   font-family: var(--font-body);
   font-weight: 500;
