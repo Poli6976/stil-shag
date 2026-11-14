@@ -55,7 +55,7 @@
 
         var box = el('div', 'auth-gate');
         box.appendChild(el('p', 'auth-gate__lead',
-          'Введите почту — пришлём код для входа. Если образ вам подарили, введите ту почту, на которую его подарили.'));
+          'Войдите по email, чтобы мы могли оформить и засчитать ваш образ — пришлём код для входа.'));
 
         var form = document.createElement('form');
         form.className = 'auth-gate__form';
