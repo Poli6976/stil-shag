@@ -281,6 +281,13 @@ async function generateTwoStep(layers, fit, gender, hair, itemPhoto) {
 
 async function tryGenerateImage(layers, fit, gender, hair, itemPhoto, itemHasPerson) {
   if (!Object.keys(layers).length) return null;
+  /* 2026-11-15 — разбор «размер на картинке не тот»: одной строкой видно, какая схема выбрана и какой размер
+     разобран из анкеты (сама анкета с ростом/весом в журнал не пишется — только разобранный размер). */
+  var loggedSize = extractClothingSize(fit);
+  console.log('looks/charge: схема —', itemPhoto
+    ? (itemHasPerson === false ? 'вещь без человека (два шага)' : itemHasPerson === true ? 'на фото человек (один шаг)' : 'человек на фото неизвестен (один шаг)')
+    : 'без фото вещи', '| размер из анкеты:', loggedSize || 'не разобран' + (fit ? ' (поле заполнено)' : ' (поле пустое)'),
+    '| фраза:', fluxBodyPhrase(loggedSize, gender) || '—', '| пол:', gender || '—');
   if (itemPhoto && process.env.FLUX_API_KEY) {
     if (itemHasPerson === false) {
       try {
